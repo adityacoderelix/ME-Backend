@@ -1,0 +1,23 @@
+const mongoose = require('mongoose');
+const PropertyRegistrationNo = require('./models/PropertyRegistrationNo');
+const data = require('./output.json'); // Ensure data.json is in the same folder
+
+// Replace with your MongoDB connection string and database name
+const dbURI = 'mongodb+srv://admin:10VToU0WupyAbo4M@majestic-escape.nk49u.mongodb.net/master-db?retryWrites=true&w=majority&appName=Majestic-Escape&authSource=admin';
+
+mongoose
+  .connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(async () => {
+    console.log('MongoDB connected');
+    try {
+      // Insert many property records. The { ordered: false } option allows
+      // the insert to continue even if some records fail (e.g., due to duplicates).
+      const result = await PropertyRegistrationNo.insertMany(data, { ordered: false });
+      console.log('Data inserted successfully:', result);
+    } catch (error) {
+      console.error('Error inserting data:', error);
+    } finally {
+      mongoose.connection.close();
+    }
+  })
+  .catch((err) => console.error('MongoDB connection error:', err));

@@ -1,0 +1,1 @@
+delete all properties by a host.
