@@ -106,7 +106,7 @@ exports.cancelBooking = async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 };
-
+//
 // Confirm a booking
 exports.confirmBooking = async (req, res) => {
   try {

@@ -33,3 +33,4 @@ router.patch("/host/confirm", bookingController.confirmBooking);
 router.delete("/:bookingId", bookingController.deleteBooking);
 
 module.exports = router;
+//
