@@ -8,6 +8,24 @@ const {
 const User = require("../models/User");
 const { default: mongoose } = require("mongoose");
 
+exports.timing = async (req, res) => {
+  try {
+    const { checkinTime, checkoutTime, propertyId } = req.body;
+    console.log("db", propertyId, checkinTime, checkoutTime);
+    const property = await ListingProperty.findByIdAndUpdate(propertyId, {
+      checkinTime: checkinTime,
+      checkoutTime: checkoutTime,
+    });
+    if (!property) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Property not found" });
+    }
+    res.status(200).json({ success: true, data: property });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
 exports.getAllStays = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -20,10 +38,10 @@ exports.getAllStays = async (req, res) => {
     // Build query object
     let query = {};
     if (type) {
-      query.type = type;
+      query.propertyType = type;
     }
     // Only include documents with status 'processing' or 'completed'
-    query.status = { $in: ['active', 'completed'] };
+    query.status = { $in: ["active", "completed"] };
 
     // Execute queries in parallel for better performance
     const [properties, totalProperties] = await Promise.all([
@@ -56,8 +74,6 @@ exports.getAllStays = async (req, res) => {
     });
   }
 };
-
-
 
 exports.getAllStaticProperties = async (req, res) => {
   try {
@@ -157,21 +173,24 @@ exports.getAllProperties = async (req, res) => {
   }
 };
 
-
 exports.getProcessingListingsForAdmin = async (req, res) => {
   try {
     // ---- STATS ----
     const totalListings = await ListingProperty.countDocuments({});
-    const totalActiveListings = await ListingProperty.countDocuments({ status: "active" });
-    const totalPendingListings = await ListingProperty.countDocuments({ status: "processing" });
-    
+    const totalActiveListings = await ListingProperty.countDocuments({
+      status: "active",
+    });
+    const totalPendingListings = await ListingProperty.countDocuments({
+      status: "processing",
+    });
+
     // Count how many listings were created "today"
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0); // midnight of current day
     const listingsToday = await ListingProperty.countDocuments({
       createdAt: { $gte: startOfToday },
     });
-    
+
     // ---- PAGINATION FOR PROCESSING LISTINGS ----
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 30;
@@ -179,10 +198,14 @@ exports.getProcessingListingsForAdmin = async (req, res) => {
 
     // We want only "processing" listings
     const query = { status: "processing" };
-    
+
     // Fetch the listing data in parallel
     const [properties, totalProperties] = await Promise.all([
-      ListingProperty.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      ListingProperty.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       ListingProperty.countDocuments(query),
     ]);
 
@@ -216,40 +239,48 @@ exports.getFilteredListingsForAdmin = async (req, res) => {
   try {
     // ---- STATS ----
     const totalListings = await ListingProperty.countDocuments({});
-    const totalActiveListings = await ListingProperty.countDocuments({ status: "active" });
-    const totalPendingListings = await ListingProperty.countDocuments({ status: "processing" });
-    
+    const totalActiveListings = await ListingProperty.countDocuments({
+      status: "active",
+    });
+    const totalPendingListings = await ListingProperty.countDocuments({
+      status: "processing",
+    });
+
     // Count how many listings were created "today"
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0); // midnight of current day
     const listingsToday = await ListingProperty.countDocuments({
       createdAt: { $gte: startOfToday },
     });
-    
+
     // ---- PAGINATION FOR FILTERED LISTINGS ----
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 30;
     const skip = (page - 1) * limit;
 
     // Get the status filter from the query
-    const statusFilter = req.query.status || 'all'; // Default to 'all' if no status is provided
-console.log("Status", statusFilter)
+    const statusFilter = req.query.status || "all"; // Default to 'all' if no status is provided
+    console.log("Status", statusFilter);
 
     // Prepare the query based on the status filter
     let query = {};
-    if (statusFilter !== 'all') {
+    if (statusFilter !== "all") {
       query.status = statusFilter; // Only filter by status if it's not 'all'
     }
 
     // Fetch the listing data in parallel
     const [properties, totalProperties] = await Promise.all([
-      ListingProperty.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      ListingProperty.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       ListingProperty.countDocuments(query),
     ]);
 
     const totalPages = Math.ceil(totalProperties / limit);
     const hasMore = page * limit < totalProperties;
-
+    console.log(properties);
     return res.status(200).json({
       // Stats
       totalListings,
@@ -272,9 +303,6 @@ console.log("Status", statusFilter)
     });
   }
 };
-
-
-
 
 exports.approveListing = async (req, res) => {
   try {
@@ -302,21 +330,17 @@ exports.approveListing = async (req, res) => {
   }
 };
 
-
 exports.getPropertyById = async (req, res) => {
   try {
-    const property = await ListingProperty.findById(req.params.id);
+    console.log(req.params.id);
+    const property = await ListingProperty.findById(req.params.id).populate(
+      "host"
+    );
+    console.log(property);
     if (!property) {
       return res.status(404).json({ message: "Property not found" });
     }
-    const propertyWithDummyData = {
-      ...property.toObject(),
-      // host: dummyHostData,
-      reviewsData: dummyReviewsData,
-      ...dummyPropertyData,
-    };
-
-    res.status(200).json(propertyWithDummyData);
+    res.status(200).json({ success: true, data: property });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -364,6 +388,7 @@ exports.createListingProperty = async (req, res) => {
   try {
     const { ...propertyData } = req.body;
     const user = await User.findOne({ email: req.body.hostEmail });
+    console.log("xmennn", propertyData);
 
     if (!user) {
       return res.status(404).json({ message: "Host not found" });
@@ -448,7 +473,6 @@ exports.getUserPropertyListings = async (req, res) => {
     });
   }
 };
-
 
 exports.getPropertyListings = async (req, res) => {
   console.log("getPropertyListings");

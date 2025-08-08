@@ -42,4 +42,5 @@ router.get(
   propertyController.getUserPropertyListings
 );
 
+router.post("/timings", propertyController.timing);
 module.exports = router;
