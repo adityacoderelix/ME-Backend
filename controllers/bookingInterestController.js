@@ -1,15 +1,23 @@
-const Booking = require('../models/BookingInterest');
+const Booking = require("../models/BookingInterest");
+const User = require("../models/User");
 
 exports.createBooking = async (req, res) => {
   try {
-    const { propertyId, dateFrom, dateTo, guests, specialOffers } = req.body;
+    const { userId, propertyId, dateFrom, dateTo, guests, specialOffers } =
+      req.body;
+    console.log("this is id", userId);
+    const userData = await User.findById(userId);
 
+    const email = await userData.email;
+    console.log("this is email", email);
     const newBooking = new Booking({
+      userId,
+      email,
       propertyId,
       dateFrom,
       dateTo,
       guests,
-      specialOffers
+      specialOffers,
     });
 
     const savedBooking = await newBooking.save();
@@ -17,13 +25,13 @@ exports.createBooking = async (req, res) => {
     res.status(201).json({
       success: true,
       data: savedBooking,
-      message: 'Booking created successfully'
+      message: "Booking created successfully",
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      message: 'Error creating booking',
-      error: error.message
+      message: "Error creating booking",
+      error: error.message,
     });
   }
 };
@@ -34,14 +42,13 @@ exports.getBookings = async (req, res) => {
     res.status(200).json({
       success: true,
       data: bookings,
-      message: 'Bookings retrieved successfully'
+      message: "Bookings retrieved successfully",
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      message: 'Error retrieving bookings',
-      error: error.message
+      message: "Error retrieving bookings",
+      error: error.message,
     });
   }
 };
-
