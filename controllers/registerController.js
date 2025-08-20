@@ -3,7 +3,8 @@ const { generateOTP, sendOTP } = require("../utils/otpUtils");
 const { sendWelcomeMail } = require("../utils/sendWelcomeMail");
 const jwt = require("jsonwebtoken");
 
-const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+const capitalize = (str) =>
+  str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 
 // Constants
 const MAX_RETRIES = 3;
@@ -101,6 +102,7 @@ const requestOTP = async (req, res) => {
         }
 
         return res.status(200).json({
+          userId: user._id,
           requestType: "REGISTRATION_OTP_REQUEST",
           success: true,
           code: "OTP_SENT",
@@ -131,7 +133,6 @@ const requestOTP = async (req, res) => {
     });
   }
 };
-
 
 const verifyOTP = async (req, res) => {
   try {
@@ -171,7 +172,8 @@ const verifyOTP = async (req, res) => {
         success: false,
         error: true,
         code: "ACCOUNT_LOCKED",
-        message: "Account is temporarily locked due to multiple failed attempts",
+        message:
+          "Account is temporarily locked due to multiple failed attempts",
         statusCode: 423,
         unlocksAt: {
           unlocksAt: user.lockUntil.toISOString(),
@@ -181,7 +183,11 @@ const verifyOTP = async (req, res) => {
     }
 
     // Check if OTP is expired
-    if (!user.otp || !user.otp.value || new Date(user.otp.expiry).getTime() < Date.now()) {
+    if (
+      !user.otp ||
+      !user.otp.value ||
+      new Date(user.otp.expiry).getTime() < Date.now()
+    ) {
       return res.status(410).json({
         requestType: "REGISTRATION_OTP_VERIFICATION",
         success: false,
@@ -217,6 +223,7 @@ const verifyOTP = async (req, res) => {
       }
 
       await user.save();
+
       return res.status(400).json({
         requestType: "REGISTRATION_OTP_VERIFICATION",
         success: false,
@@ -253,6 +260,7 @@ const verifyOTP = async (req, res) => {
     );
 
     return res.status(200).json({
+      userId: user._id,
       requestType: "REGISTRATION_OTP_VERIFICATION",
       success: true,
       error: false,
@@ -276,7 +284,6 @@ const verifyOTP = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   requestOTP,
