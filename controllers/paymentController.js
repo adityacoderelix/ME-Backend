@@ -3,6 +3,7 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const Payment = require("../models/Payment");
 const User = require("../models/User");
+const Booking = require("../models/Booking");
 const razorpay = new Razorpay({
   key_id: "rzp_test_w0bKE5w5UPOPrY",
   key_secret: "iYRZ22GvJhYb5ryCmhAc6wig",
@@ -10,7 +11,7 @@ const razorpay = new Razorpay({
 // Create a new order
 exports.createOrder = async (req, res) => {
   try {
-    const { userId, currency, amount } = req.body;
+    const { bookingId, userId, currency, amount } = req.body;
 
     // Validate amount
     if (!amount || amount < 100) {
@@ -22,6 +23,9 @@ exports.createOrder = async (req, res) => {
 
     //Find User Details
     const user = await User.findById(userId);
+    const ObjectId = require("mongoose").Types.ObjectId;
+
+    console.log("not nic", bookingId);
 
     // Create order with Razorpay
     const order = await razorpay.orders.create({
@@ -35,6 +39,7 @@ exports.createOrder = async (req, res) => {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
+      bookingId: bookingId,
       customerDetails: {
         name: user.firstName + " " + user.lastName,
         email: user.email,
