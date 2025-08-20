@@ -5,7 +5,11 @@ const logSchema = new mongoose.Schema({
   //   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   email: { type: String, required: true },
-  type: { type: String, enum: ["OCR", "Status", "Gst"], required: true },
+  type: {
+    type: String,
+    enum: ["OCR", "Status", "Gst", "Gst Pan"],
+    required: true,
+  },
   status: {
     type: String,
     enum: ["pending", "success", "failed"],
