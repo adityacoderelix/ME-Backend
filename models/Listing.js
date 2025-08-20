@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const propertySchema = new mongoose.Schema({
   // Property details
@@ -32,7 +32,10 @@ const propertySchema = new mongoose.Schema({
   cleaningFee: { type: String },
   weeklyDiscount: { type: Number, default: 0 },
   monthlyDiscount: { type: Number, default: 0 },
-  cancellationPolicy: { type: String, enum: ['Flexible', 'Moderate', 'Strict'] },
+  cancellationPolicy: {
+    type: String,
+    enum: ["Flexible", "Moderate", "Strict"],
+  },
   instantBook: { type: Boolean, default: false },
   flashBook: { type: Boolean, default: false },
   securityDeposit: { type: String },
@@ -57,11 +60,13 @@ const propertySchema = new mongoose.Schema({
   firstAidKit: { type: Boolean, default: false },
 
   // Reviews and ratings
-  reviews: [{
-    reviewer: { type: String },
-    comment: { type: String },
-    rating: { type: Number, min: 0, max: 5 }
-  }],
+  reviews: [
+    {
+      reviewer: { type: String },
+      comment: { type: String },
+      rating: { type: Number, min: 0, max: 5 },
+    },
+  ],
   rating: { type: Number, default: 0 },
 
   // Additional services
@@ -70,9 +75,9 @@ const propertySchema = new mongoose.Schema({
   workspace: { type: Boolean, default: false },
 
   // Metadata
-  listingStatus: { type: String, default: 'Draft' },
+  listingStatus: { type: String, default: "Draft" },
   dateCreated: { type: Date, default: Date.now },
-  dateUpdated: { type: Date }
+  dateUpdated: { type: Date },
 });
 
-module.exports = mongoose.model('Property', propertySchema);
+module.exports = mongoose.model("Property", propertySchema);
