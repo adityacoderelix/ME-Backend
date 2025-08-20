@@ -208,6 +208,7 @@ const verifyOTP = async (req, res) => {
     );
 
     return res.status(200).json({
+      userId: user._id,
       requestType: "LOGIN_OTP_VERIFICATION",
       success: true,
       error: false,
