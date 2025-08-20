@@ -7,6 +7,7 @@ require("dotenv").config();
 
 exports.createhostKycForm = async (req, res) => {
   try {
+    console.log("enterd create host");
     const kyc = new kycHostForm(req.body);
     await kyc.save();
     res.status(200).json({ success: true, data: kyc });
@@ -57,12 +58,14 @@ exports.updatehostKycFormStatus = async (req, res) => {
 };
 exports.updatehostKycFormGstStatus = async (req, res) => {
   try {
-    const { userId, isVerified } = req.body;
+    const { userId, panNumber, gstNumber, isVerified } = req.body;
 
     const response = await kycHostForm.findOneAndUpdate(
       { hostId: new mongoose.Types.ObjectId(userId) },
       {
         $set: {
+          "gstInfo.panNumber": panNumber,
+          "gstInfo.gstNumber": gstNumber,
           "gstInfo.isVerified": isVerified,
         },
       }
@@ -96,6 +99,25 @@ exports.fetchhostKycFormById = async (req, res) => {
   try {
     const { id } = req.params;
     const data = await kycHostForm.findById(id);
+
+    if (!data) {
+      return res
+        .status(404)
+        .json({ message: "Property not found or unauthorized to update" });
+    }
+
+    res.status(200).json({ success: true, data: data });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+exports.fetchhostKycFormByUserId = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await kycHostForm.findOne({
+      hostId: new mongoose.Types.ObjectId(id),
+    });
 
     if (!data) {
       return res
