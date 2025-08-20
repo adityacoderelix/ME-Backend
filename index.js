@@ -104,10 +104,11 @@ const kycRoutes = require("./routes/kycRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
-
+const reviewRoutes = require("./routes/reviewRoutes");
 // const stayRoutes = require("./routes/stayRoutes");
 const panKycRoutes = require("./routes/panKycRoutes");
 const propertyRegistrationNoRoutes = require("./routes/propertyRegistrationNoRoutes");
+const hostRoutes = require("./routes/hostRoutes");
 // const voterKycRoutes = require("./routes/voterKycRoutes");
 // const passportKycRoutes = require("./routes/passportKycRoutes");
 // const gstKycRoutes = require("./routes/gstKycRoutes");
@@ -140,9 +141,9 @@ app.use("/api/v1/uploads", uploadRoutes);
 app.use("/api/v1/host-bank", uploadRoutes);
 app.use("/api/v1/property-registration-no", propertyRegistrationNoRoutes);
 // app.use("/api/v1/stay", stayRoutes);
-
+app.use("/api/v1/review", reviewRoutes);
 app.use("/api/v1/admin", adminRoutes);
-
+app.use("/api/v1/hostData", hostRoutes);
 // KYC Routes
 app.use("/api/v1/pan-kyc", panKycRoutes);
 // app.use("/api/v1/voter-kyc", voterKycRoutes);
