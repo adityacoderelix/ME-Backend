@@ -19,7 +19,7 @@ router.post("/form", hostFormController.createhostKycForm);
 router.put("/update-form/:id", hostFormController.updatehostKycForm);
 router.get("/form/:id", hostFormController.fetchhostKycForm);
 router.get("/form-kyc/:id", hostFormController.fetchhostKycFormById);
-
+router.get("/user/:id", hostFormController.fetchhostKycFormByUserId);
 router.post("/verify/gst", verifyGst);
 router.patch("/verify-status", hostFormController.updatehostKycFormStatus);
 router.patch(
