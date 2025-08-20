@@ -40,6 +40,88 @@ exports.getAllBookings = async (req, res) => {
   }
 };
 
+// Get all filtered bookings (host-specific)
+exports.getAllFilterBookings = async (req, res) => {
+  try {
+    const { search, status, from, to } = req.query;
+    console.log("daysof", search, status, from, to);
+    const bookings = await Booking.find()
+      .populate("userId propertyId hostId")
+      .sort({ createdAt: -1 });
+
+    // function filter(users) {
+    //   const data = users.filter((booking) =>
+    //     status != "all"
+    //       ? (booking.userId?.firstName
+    //           ?.toLowerCase()
+    //           .includes(search.toLowerCase()) ||
+    //           booking.userId?.lastName
+    //             ?.toLowerCase()
+    //             .includes(search.toLowerCase()) ||
+    //           (booking.userId?.firstName + " " + booking.userId?.lastName)
+    //             .toLowerCase()
+    //             .includes(search.toLowerCase()) ||
+    //           booking.propertyId?.title
+    //             ?.toLowerCase()
+    //             .includes(search.toLowerCase())) &&
+    //         new Date(booking.checkIn) >= new Date(from) &&
+    //         new Date(booking.checkOut) <= new Date(to)
+    //       : booking.userId?.firstName
+    //           ?.toLowerCase()
+    //           .includes(search.toLowerCase()) ||
+    //         booking.userId?.lastName
+    //           ?.toLowerCase()
+    //           .includes(search.toLowerCase()) ||
+    //         (booking.userId?.firstName + " " + booking.userId?.lastName)
+    //           .toLowerCase()
+    //           .includes(search.toLowerCase()) ||
+    //         booking.propertyId?.title
+    //           ?.toLowerCase()
+    //           .includes(search.toLowerCase()) ||
+    //         (new Date(booking.checkIn) >= new Date(from) &&
+    //           booking.status.toLowerCase() == status.toLowerCase())
+    //   );
+    //   return data;
+    // }
+    function filter(users) {
+      return users.filter((booking) => {
+        const matchesSearch =
+          booking.userId?.firstName
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+          booking.userId?.lastName
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+          (booking.userId?.firstName + " " + booking.userId?.lastName)
+            .toLowerCase()
+            .includes(search.toLowerCase()) ||
+          booking.propertyId?.title
+            ?.toLowerCase()
+            .includes(search.toLowerCase());
+
+        const matchesDate =
+          new Date(booking.checkIn) >= new Date(from) &&
+          new Date(booking.checkOut) <= new Date(to);
+
+        const matchesStatus =
+          status.toLowerCase() === "all"
+            ? "true"
+            : booking.status?.toLowerCase() === status.toLowerCase();
+
+        return matchesSearch && matchesDate && matchesStatus;
+      });
+    }
+
+    const final = filter(bookings);
+    res.json({ success: true, data: final });
+
+    // const bookings = await Booking.find().populate("userId propertyId hostId");
+    // res.status(200).json({ success: true, data: bookings });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.getAllUserBookings = async (req, res) => {
   try {
     const bookings = await Booking.find().populate("userId propertyId hostId");
