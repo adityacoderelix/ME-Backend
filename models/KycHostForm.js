@@ -16,20 +16,20 @@ const personalInfoSchema = {
 };
 
 const documentInfoSchema = {
-  documentType: { type: String, default: null },
-  documentSize: {
-    type: Number,
-    default: null,
-    max: 5000000,
-  },
-  documentNumber: { type: String, default: null },
-  documentFile: { type: String, default: null }, // Assuming you store file URL or path
+  documentType: { type: String, default: "" },
+  // documentSize: {
+  //   type: Number,
+  //   default: null,
+  //   max: 5000000,
+  // },
+  // documentNumber: { type: String, default: null },
+  // documentFile: { type: String, default: null }, // Assuming you store file URL or path
   isVerified: { type: Boolean, default: false },
 };
 
 const gstInfoSchema = {
   gstNumber: { type: String, default: "" },
-  gstName: { type: String, default: "" },
+  panNumber: { type: String, default: "" },
   isVerified: { type: Boolean, default: false },
 };
 
@@ -48,7 +48,11 @@ const kycHostSchema = new mongoose.Schema(
     documentInfo: documentInfoSchema,
     gstInfo: gstInfoSchema,
     acceptedTerms: acceptedTermsSchema,
-    status: { type: String, default: "incomplete" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "completed"],
+      default: "pending",
+    },
     hostEmail: { type: String }, // Ensure it's set from auth.user.email
   },
   { timestamps: true }
