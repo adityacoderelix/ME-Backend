@@ -1,6 +1,7 @@
 const KycLogs = require("../models/KycLogs");
 const User = require("../models/User");
 const { v4: uuidv4 } = require("uuid");
+const axios = require("axios");
 const OCR_API = process.env.OCR_API;
 const STATUS_GST = process.env.STATUS_GST;
 const AUTH_HEADER = process.env.AUTH_HEADER;
@@ -16,19 +17,16 @@ function makeClientRefId(prefix) {
   let id = `${prefix}-${uuidv4()}`; // uuidv4 is 36 chars, prefix+dash ~ +4 -> < 45 OK usually
   return id.slice(0, 45);
 }
-
 async function performGstCheck(requestData) {
+  console.log("gst access");
   try {
-    const response = await axios.post(
-      `${STATUS_GST}/gst-authentication`,
-      requestData,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: getAuthHeader(),
-        },
-      }
-    );
+    const response = await axios.post(`${STATUS_GST}/gst`, requestData, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: getAuthHeader(),
+      },
+    });
+    console.log("gst ", response.data);
     return response.data;
   } catch (error) {
     const errorMessage = error.response?.data
@@ -37,26 +35,105 @@ async function performGstCheck(requestData) {
     console.log("Gst not validated", errorMessage);
   }
 }
+
+async function performPanCheck(requestData) {
+  try {
+    const response = await axios.post(
+      `${STATUS_GST}/gstpansearch`,
+      requestData,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: getAuthHeader(),
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    const errorMessage = error.response?.data
+      ? JSON.stringify(error.response.data.error, null, 2)
+      : error.message;
+    console.log("PAN not validated", errorMessage);
+  }
+}
+
 exports.verifyGst = async (req, res) => {
-  const { userId, name, number } = req.body;
-  if (!userId) return res.status(400).json({ error: "userId required" });
-  console.log("super ma", userId, number);
-  const user = await User.findById(userId);
-  if (!user) return res.status(404).json({ error: "User not found" });
-  console.log("super ma", user);
-  const statusClientRefNum = makeClientRefId("STATUS");
-  const statusLog = await KycLogs.create({
-    userId,
-    email: user.email,
-    type: "Gst",
-    requestData: {
-      gstin: number,
-    },
-  });
-  const statusResult = await performGstCheck(statusLog.requestData);
-  statusLog.status = "success";
-  statusLog.responseData = statusResult;
-  await statusLog.save();
-  console.log("marve", statusResult);
-  return res.json({ success: true, statusResult });
+  try {
+    const { userId, panNumber, gstNumber } = req.body;
+
+    if (!userId) return res.status(400).json({ error: "userId required" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const statusClientRefNum = makeClientRefId("PAN");
+    const statusLog = await KycLogs.create({
+      userId,
+      email: user.email,
+      type: "Gst Pan",
+      requestData: {
+        pan: panNumber,
+        client_ref_num: statusClientRefNum,
+      },
+    });
+    const statusResult = await performPanCheck(statusLog.requestData);
+    if (statusResult.http_response_code != 200) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Business PAN not found " });
+    }
+    statusLog.status = "success";
+    statusLog.responseData = statusResult;
+    await statusLog.save();
+
+    const data = statusResult?.result?.gstinResList.filter(
+      (item) => item.gstin == gstNumber
+    );
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Gst associated with Business PAN not found ",
+      });
+    }
+
+    if (data[0].authStatus != "Active") {
+      return res.status(404).json({
+        success: false,
+        message: "Gst associated with Business PAN inactive ",
+      });
+    }
+
+    const statusGstClientRefNum = makeClientRefId("GST");
+
+    const statusGstLog = await KycLogs.create({
+      userId,
+      email: user.email,
+      type: "Gst",
+      requestData: {
+        gstin: gstNumber,
+        client_ref_num: statusGstClientRefNum,
+      },
+    });
+
+    const statusGstResult = await performGstCheck(statusGstLog.requestData);
+    if (statusGstResult.http_response_code != 200) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Gst data not found " });
+    }
+    statusGstLog.status = "success";
+    statusGstLog.responseData = statusGstResult;
+    await statusGstLog.save();
+
+    return res.json({ success: true, data: statusGstResult });
+  } catch (error) {
+    console.error("verifyKYC error:", err.response?.data || err.message || err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Server error",
+      details: err.response?.data,
+    });
+  }
 };
