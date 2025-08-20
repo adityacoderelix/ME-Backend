@@ -2,9 +2,19 @@ const mongoose = require("mongoose");
 
 const reviewSchema = new mongoose.Schema(
   {
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Booking",
+      required: true,
+    },
+    hostId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     property: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Property",
+      ref: "ListingProperty",
       required: true,
     },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
