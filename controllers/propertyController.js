@@ -1,5 +1,6 @@
 const Property = require("../models/Property");
 const ListingProperty = require("../models/ListingProperty");
+const { sendEmail } = require("../utils/sendEmail");
 const {
   dummyHostData,
   dummyReviewsData,
@@ -306,16 +307,62 @@ exports.getFilteredListingsForAdmin = async (req, res) => {
 
 exports.approveListing = async (req, res) => {
   try {
+    console.log("entered in new op");
     const { id } = req.params; // listing ID
+
+    const property = await ListingProperty.findById(id);
+    const host = await User.findById(property?.host);
+    console.log("new riv", host);
     const updatedListing = await ListingProperty.findByIdAndUpdate(
       id,
       { status: "active" },
       { new: true }
     );
-
     if (!updatedListing) {
       return res.status(404).json({ message: "Listing not found" });
     }
+
+    const hostName = host?.firstName + " " + host?.lastName;
+    const params = { hostName: hostName };
+    const adminEmail = "majesticescape.in@gmail.com";
+    await sendEmail(host?.email, 25, params);
+    // await sendEmail(adminEmail, 26, params);
+
+    return res.status(200).json({
+      message: "Listing approved successfully",
+      listing: updatedListing,
+    });
+  } catch (error) {
+    console.error("Error approving listing:", error);
+    return res.status(500).json({
+      message: "Failed to approve listing",
+      error: error.message,
+    });
+  }
+};
+
+exports.deListing = async (req, res) => {
+  try {
+    console.log("entered in new op");
+    const { id } = req.params; // listing ID
+
+    const property = await ListingProperty.findById(id);
+    const host = await User.findById(property?.host);
+    console.log("new riv", host);
+    const updatedListing = await ListingProperty.findByIdAndUpdate(
+      id,
+      { status: "inactive" },
+      { new: true }
+    );
+    if (!updatedListing) {
+      return res.status(404).json({ message: "Listing not found" });
+    }
+
+    const hostName = host?.firstName + " " + host?.lastName;
+    const params = { hostName: hostName };
+    const adminEmail = "majesticescape.in@gmail.com";
+    await sendEmail(host?.email, 27, params);
+    // await sendEmail(adminEmail, 28, params);
 
     return res.status(200).json({
       message: "Listing approved successfully",
@@ -371,15 +418,28 @@ exports.updateProperty = async (req, res) => {
 };
 
 exports.deleteProperty = async (req, res) => {
-  console.log("deleteProperty", req.params.id);
   try {
+    const { id } = req.params; // listing ID
+
+    const propertyData = await ListingProperty.findById(id);
+    const host = await User.findById(propertyData?.host);
+
     const property = await ListingProperty.findByIdAndDelete(req.params.id);
     if (!property) {
       console.log("deleteProperty", "No property found");
 
       return res.status(404).json({ message: "Property not found" });
     }
-    res.status(200).json({ message: "Property deleted successfully" });
+
+    const hostName = host?.firstName + " " + host?.lastName;
+    const params = { hostName: hostName };
+    const adminEmail = "majesticescape.in@gmail.com";
+    await sendEmail(req.query.email, 23, params);
+    // await sendEmail(adminEmail, 24, params);
+
+    const hostId = await res
+      .status(200)
+      .json({ message: "Property deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -422,6 +482,27 @@ exports.updateListingProperty = async (req, res) => {
       { _id: id, host: user._id },
       { $set: req.body },
       { new: true, runValidators: true }
+    );
+
+    if (!property) {
+      return res
+        .status(404)
+        .json({ message: "Property not found or unauthorized to update" });
+    }
+
+    res.status(200).json(property);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.updateKycProperty = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log("enre", id);
+    const property = await ListingProperty.updateMany(
+      { host: id },
+      { $set: { kycStatus: "completed" } }
     );
 
     if (!property) {

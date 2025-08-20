@@ -21,7 +21,7 @@ const propertySchema = new mongoose.Schema({
   },
   occupancy: {
     type: [String],
-    enum: ["self-check-in","me", "family", "guests", "flatmates"],
+    enum: ["self-check-in", "me", "family", "guests", "flatmates"],
     default: [],
   },
 
@@ -57,7 +57,7 @@ const propertySchema = new mongoose.Schema({
     city: String,
     state: String,
     pincode: String,
-    
+
     country: {
       type: String,
       default: "India - IN",
@@ -66,7 +66,7 @@ const propertySchema = new mongoose.Schema({
     longitude: Number,
   },
 
-  validRegistrationNo	: {
+  validRegistrationNo: {
     type: Boolean,
     default: false,
   },
@@ -120,16 +120,35 @@ const propertySchema = new mongoose.Schema({
   hostEmail: {
     type: String,
   },
+  checkinTime: {
+    type: String,
+  },
+  checkoutTime: {
+    type: String,
+  },
   selectedRules: [String],
   customRules: [String],
   createdAt: {
     type: Date,
     default: Date.now,
   },
+  kycStatus: {
+    type: String,
+    enum: ["completed", "pending"],
+    default: "pending",
+  },
   safetyFeatures: {
     exteriorCamera: safetyFeatureSchema,
     noiseMonitor: safetyFeatureSchema,
     weapons: safetyFeatureSchema,
+  },
+  averageRating: {
+    type: Number,
+    default: 0,
+  },
+  reviewCount: {
+    type: Number,
+    default: 0,
   },
   updatedAt: {
     type: Date,

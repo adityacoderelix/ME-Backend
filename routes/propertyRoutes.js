@@ -20,7 +20,14 @@ router.get(
   propertyController.getFilteredListingsForAdmin
 );
 // PUT approve a listing
-router.put("/admin/approve/:id", propertyController.approveListing);
+router.patch(
+  "/admin/approve/:id",
+  authMiddleware,
+  propertyController.approveListing
+);
+
+router.patch("/admin/delist/:id", authMiddleware, propertyController.deListing);
+
 router.delete(
   "/user-property/:id",
   authMiddleware,
@@ -36,6 +43,7 @@ router.put(
   "/update-listing-property/:id",
   propertyController.updateListingProperty
 );
+router.patch("/update-kyc-property/:id", propertyController.updateKycProperty);
 router.get(
   "/user-properties/:userEmail",
   authMiddleware,
