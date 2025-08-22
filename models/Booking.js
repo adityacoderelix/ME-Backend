@@ -26,6 +26,24 @@ const bookingSchema = new mongoose.Schema({
     enum: ["strict", "moderate", "flexible"],
     default: "moderate",
   },
+  guests: {
+    type: Number,
+    default: 1,
+  },
+  adults: {
+    type: Number,
+    default: 1,
+  },
+  children: {
+    type: Number,
+  },
+  infants: {
+    type: Number,
+    max: 5,
+  },
+  nights: {
+    type: Number,
+  },
   refundAmount: Number,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

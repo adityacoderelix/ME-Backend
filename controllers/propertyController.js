@@ -434,7 +434,7 @@ exports.deleteProperty = async (req, res) => {
     const hostName = host?.firstName + " " + host?.lastName;
     const params = { hostName: hostName };
     const adminEmail = "majesticescape.in@gmail.com";
-    await sendEmail(req.query.email, 23, params);
+    await sendEmail(host.email, 23, params);
     // await sendEmail(adminEmail, 24, params);
 
     const hostId = await res
@@ -444,6 +444,35 @@ exports.deleteProperty = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.deleteHostProperty = async (req, res) => {
+  try {
+    const { id } = req.params; // listing ID
+
+    const propertyData = await ListingProperty.findById(id);
+    const host = await User.findById(propertyData?.host);
+
+    const property = await ListingProperty.findByIdAndDelete(req.params.id);
+    if (!property) {
+      console.log("deleteProperty", "No property found");
+
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    const hostName = host?.firstName + " " + host?.lastName;
+    const params = { hostName: hostName };
+    const adminEmail = "majesticescape.in@gmail.com";
+    await sendEmail(host.email, 29, params);
+    // await sendEmail(adminEmail, 30, params);
+
+    const hostId = await res
+      .status(200)
+      .json({ message: "Property deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 exports.createListingProperty = async (req, res) => {
   try {
     const { ...propertyData } = req.body;

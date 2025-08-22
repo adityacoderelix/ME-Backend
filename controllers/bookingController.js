@@ -99,9 +99,10 @@ exports.getAllFilterBookings = async (req, res) => {
             ?.toLowerCase()
             .includes(search.toLowerCase());
 
-        const matchesDate =
-          new Date(booking.checkIn) >= new Date(from) &&
-          new Date(booking.checkOut) <= new Date(to);
+        const matchesDate = to
+          ? new Date(booking.checkIn) >= new Date(from) &&
+            new Date(booking.checkOut) <= new Date(to)
+          : new Date(booking.checkIn) >= new Date(from);
 
         const matchesStatus =
           status.toLowerCase() === "all"
@@ -207,6 +208,39 @@ exports.cancelBooking = async (req, res) => {
     await sendEmail(userEmail, 11, params);
     // await sendEmail(adminEmail, 16, params);
     await sendEmail(hostEmail, 17, params);
+    res.status(200).json({ success: true, data: booking });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+exports.cancelAdminBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    console.log("testc", bookingId);
+    const booking = await Booking.findByIdAndUpdate(bookingId, {
+      status: "cancelled",
+    });
+    const data = await Booking.findById(bookingId).populate("userId hostId");
+    if (!data) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User data not found" });
+    }
+    const userName = data?.userId?.firstName + " " + data?.userId?.lastName;
+    const hostName = data?.hostId?.firstName + " " + data?.hostId?.lastName;
+
+    const params = { userName: userName, hostName: hostName };
+    if (!booking)
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    const userEmail = data?.userId?.email;
+    const hostEmail = data?.hostId?.email;
+    const adminEmail = "majesticescape.in@gmail.com";
+    await sendEmail(userEmail, 32, params);
+    // await sendEmail(adminEmail, 31, params);
+    await sendEmail(hostEmail, 33, params);
     res.status(200).json({ success: true, data: booking });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

@@ -44,6 +44,13 @@ router.put("/:bookingId", authMiddleware, bookingController.updateBooking);
 // Reject a booking (host action)
 router.patch("/host/cancel", authMiddleware, bookingController.cancelBooking);
 
+// Reject a booking (Admin action)
+router.patch(
+  "/admin/cancel",
+  authMiddleware,
+  bookingController.cancelAdminBooking
+);
+
 // Cancel a booking (user action)
 router.patch(
   "/user/terminate",

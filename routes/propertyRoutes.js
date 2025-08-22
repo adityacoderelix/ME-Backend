@@ -34,6 +34,12 @@ router.delete(
   propertyController.deleteProperty
 );
 
+router.delete(
+  "/host/user-property/:id",
+  authMiddleware,
+  propertyController.deleteHostProperty
+);
+
 router.post(
   "/create-listing-property",
   propertyController.createListingProperty

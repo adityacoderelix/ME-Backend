@@ -98,7 +98,13 @@ exports.submitReview = async (req, res) => {
     await review.save();
     const listproperty = await ListingProperty.findById(booking.propertyId);
     // 3. Calculate new average rating for this property
-    if (!listproperty.averageRating) {
+    if (!listproperty) {
+      return res.status(404).json({
+        success: false,
+        message: "No property found.",
+      });
+    }
+    if (listproperty.averageRating == 0) {
       const result = await Review.aggregate([
         {
           $match: { property: new mongoose.Types.ObjectId(booking.propertyId) },
