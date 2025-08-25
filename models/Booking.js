@@ -44,6 +44,10 @@ const bookingSchema = new mongoose.Schema({
   nights: {
     type: Number,
   },
+  reviewed: {
+    type: Boolean,
+    default: false,
+  },
   refundAmount: Number,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

@@ -574,11 +574,18 @@ exports.confirmInstantBooking = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Booking not found" });
     }
-
+    const host = await Booking.findById(bookingId).populate(
+      "hostId propertyId"
+    );
+    const hostEmail = host.hostId.email;
     const data = await User.findById(userId);
     const userEmail = await data.email;
-    await sendEmail(userEmail, 10, params);
 
+    const adminEmail = "majesticescape.in@gmail.com";
+
+    await sendEmail(userEmail, 35, params);
+    await sendEmail(hostEmail, 34, params);
+    // await sendEmail(adminEmail, 36, params);
     // (async function () {
     //   try {
     //     await agenda.start();

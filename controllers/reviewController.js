@@ -144,6 +144,14 @@ exports.submitReview = async (req, res) => {
           .status(404)
           .json({ success: false, message: "Property not found" });
       }
+      const updateStatus = await Booking.findByIdAndUpdate(bookingId, {
+        reviewed: true,
+      });
+      if (!updateStatus) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Review not found" });
+      }
       res.status(201).json({
         success: true,
         data: updatedProperty,
@@ -168,6 +176,14 @@ exports.submitReview = async (req, res) => {
           .status(404)
           .json({ success: false, message: "Property not found" });
       }
+      const updateStatus = await Booking.findByIdAndUpdate(bookingId, {
+        reviewed: true,
+      });
+      if (!updateStatus) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Review not found" });
+      }
       res.status(201).json({
         success: true,
         data: updatedProperty,
@@ -180,7 +196,23 @@ exports.submitReview = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+exports.checkReview = async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    const data = await Review.find({ bookingId: id });
+    console.log("supernm", data);
+    if (!data || data.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, data: false, message: "Review not found" });
+    }
+
+    res.status(201).json({ success: true, data: true });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
 exports.verifyToken = async (req, res) => {
   try {
     const { emailToken } = req.body;
