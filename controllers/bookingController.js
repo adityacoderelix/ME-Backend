@@ -7,6 +7,7 @@ const Agenda = require("agenda");
 const { sendEmail } = require("../utils/sendEmail");
 const User = require("../models/User");
 const Razorpay = require("razorpay");
+const getUnavailableDates = require("../services/getUnavailableDates");
 const TOKEN_EXPIRATION = "14d";
 const mongoConnectionString = process.env.DB_URI;
 const baseUrl = process.env.NEXTAUTH_URL;
@@ -247,6 +248,61 @@ exports.cancelAdminBooking = async (req, res) => {
   }
 };
 
+exports.getUnavailableDates = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const bookings = await Booking.find({
+      propertyId,
+      status: "confirmed",
+    });
+    const datesArray = [];
+    // const unavailableDates = await getUnavailableDates(propertyId);
+    for (let i in bookings) {
+      console.log("majims", bookings[i].checkIn);
+      const checkIn = new Date(bookings[i].checkIn);
+      const checkOut = new Date(bookings[i].checkOut);
+      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+        return; // Skip invalid dates
+      }
+
+      const currentDate = new Date(checkIn);
+      const today = new Date();
+      while (currentDate <= checkOut && checkIn > today) {
+        const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
+        datesArray.push(formattedDate);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    res.json({ success: true, data: datesArray });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getAvailableDates = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { selectedDates } = req.body; // array of YYYY-MM-DD strings
+
+    const unavailableDates = await getUnavailableDates(propertyId);
+
+    const overlap = selectedDates.some((date) =>
+      unavailableDates.includes(date)
+    );
+
+    if (overlap) {
+      return res.status(400).json({
+        success: false,
+        message: "Some of the selected dates are unavailable.",
+      });
+    }
+
+    res.json({ success: true, message: "Dates are available" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 //Cancel a booking (host)
 exports.terminateBooking = async (req, res) => {
   try {

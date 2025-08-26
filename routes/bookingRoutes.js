@@ -65,6 +65,16 @@ router.patch(
   bookingController.terminateBooking
 );
 
+router.get(
+  "/unavailable-dates/:propertyId",
+  bookingController.getUnavailableDates
+);
+
+router.post(
+  "/check-availability/:propertyId",
+  bookingController.getAvailableDates
+);
+
 // Confirm a booking (host action)
 router.patch("/host/confirm", authMiddleware, bookingController.confirmBooking);
 
