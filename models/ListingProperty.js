@@ -107,6 +107,20 @@ const propertySchema = new mongoose.Schema({
       default: false,
     },
   },
+  cancellationType: {
+    moderate: {
+      type: Boolean,
+      default: true,
+    },
+    flexible: {
+      type: Boolean,
+      default: false,
+    },
+    strict: {
+      type: Boolean,
+      default: false,
+    },
+  },
   status: {
     type: String,
     enum: ["incomplete", "processing", "inactive", "active"],
