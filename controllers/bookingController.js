@@ -253,52 +253,84 @@ exports.getUnavailableDates = async (req, res) => {
     const { propertyId } = req.params;
     const bookings = await Booking.find({
       propertyId,
-      status: "confirmed",
     });
+    const todayBooking = [];
     const datesArray = [];
     // const unavailableDates = await getUnavailableDates(propertyId);
     for (let i in bookings) {
-      console.log("majims", bookings[i].checkIn);
-      const checkIn = new Date(bookings[i].checkIn);
-      const checkOut = new Date(bookings[i].checkOut);
-      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-        return; // Skip invalid dates
-      }
+      if (
+        bookings[i].status != "cancelled" &&
+        bookings[i].status != "rejected"
+      ) {
+        const checkIn = new Date(bookings[i].checkIn);
+        const checkOut = new Date(bookings[i].checkOut);
+        if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+          return; // Skip invalid dates
+        }
 
-      const currentDate = new Date(checkIn);
-      const today = new Date();
-      while (currentDate <= checkOut && checkIn > today) {
-        const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
-        datesArray.push(formattedDate);
-        currentDate.setDate(currentDate.getDate() + 1);
+        const currentDate = new Date(checkIn);
+
+        const todayDate = new Date();
+        const today = new Date(todayDate.toLocaleDateString());
+
+        while (currentDate <= checkOut && checkIn >= today) {
+          const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
+
+          datesArray.push(formattedDate);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        const newdate = new Date(checkIn.toLocaleDateString())
+          .toISOString()
+          .split("T")[0];
+
+        if (newdate == today.toISOString().split("T")[0]) {
+          const next = new Date(checkOut);
+          if (!todayBooking.includes(next)) {
+            todayBooking.push(next.setDate(next.getDate() + 1));
+          }
+        }
       }
     }
 
-    res.json({ success: true, data: datesArray });
+    console.log("datear", datesArray);
+    res.json({ success: true, data: datesArray, today: todayBooking });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-exports.getAvailableDates = async (req, res) => {
+exports.checkDates = async (req, res) => {
   try {
     const { propertyId } = req.params;
-    const { selectedDates } = req.body; // array of YYYY-MM-DD strings
-
-    const unavailableDates = await getUnavailableDates(propertyId);
-
-    const overlap = selectedDates.some((date) =>
-      unavailableDates.includes(date)
-    );
-
-    if (overlap) {
-      return res.status(400).json({
-        success: false,
-        message: "Some of the selected dates are unavailable.",
-      });
+    const bookings = await Booking.find({
+      propertyId,
+      status: "confirmed",
+    });
+    const datesArray = [];
+    // const unavailableDates = await getUnavailableDates(propertyId);
+    for (let i in bookings) {
+      const checkIn = new Date(bookings[i].checkIn);
+      const checkOut = new Date(bookings[i].checkOut);
+      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+        return; // Skip invalid dates
+      }
+      console.log("gok", bookings[i].checkIn);
+      const currentDate = new Date(checkIn);
+      console.log("gok2", currentDate);
+      const todayDate = new Date();
+      const today = new Date(todayDate.toLocaleDateString());
+      console.log("gok3", today);
+      while (currentDate <= checkOut && checkIn >= today) {
+        console.log("gok4", bookings[i].checkIn);
+        const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
+        console.log("axax", formattedDate);
+        datesArray.push(formattedDate);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
     }
-
-    res.json({ success: true, message: "Dates are available" });
+    console.log("datear", datesArray);
+    res.json({ success: true, data: datesArray });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

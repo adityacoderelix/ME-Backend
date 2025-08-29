@@ -70,10 +70,7 @@ router.get(
   bookingController.getUnavailableDates
 );
 
-router.post(
-  "/check-availability/:propertyId",
-  bookingController.getAvailableDates
-);
+router.get("/check-dates/:propertyId", bookingController.checkDates);
 
 // Confirm a booking (host action)
 router.patch("/host/confirm", authMiddleware, bookingController.confirmBooking);
