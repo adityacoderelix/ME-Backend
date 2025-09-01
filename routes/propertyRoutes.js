@@ -7,6 +7,7 @@ router.get("/", propertyController.getAllProperties);
 router.get("/static", propertyController.getAllStaticProperties);
 router.get("/dynamic", propertyController.getAllStays);
 
+router.get("/search-properties", propertyController.getCustomSearch);
 router.get("/:id", propertyController.getPropertyById);
 router.post("/", propertyController.createProperty);
 router.put("/:id", propertyController.updateProperty);

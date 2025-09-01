@@ -1,5 +1,6 @@
 const Property = require("../models/Property");
 const ListingProperty = require("../models/ListingProperty");
+const Booking = require("../models/Booking");
 const { sendEmail } = require("../utils/sendEmail");
 const {
   dummyHostData,
@@ -8,6 +9,39 @@ const {
 } = require("../utils/data");
 const User = require("../models/User");
 const { default: mongoose } = require("mongoose");
+
+exports.getCustomSearch = async (req, res) => {
+  try {
+    const { from, to, guests } = req.query;
+
+    const checkin = new Date(from);
+    const checkout = new Date(to);
+
+    // 1. Find all bookings that overlap with the given date range
+    // (not just inside but also overlapping)
+    const bookings = await Booking.find({
+      $or: [
+        { checkIn: { $lte: checkout }, checkOut: { $gte: checkin } }, // overlapping condition
+      ],
+    }).select("propertyId"); // only fetch propertyId
+
+    console.log("big big", bookings);
+    // 2. Collect booked property IDs
+    const bookedPropertyIds = bookings.map((b) => b.propertyId);
+
+    // 3. Find properties that are NOT booked in this date range
+    const availableProperties = await ListingProperty.find({
+      _id: { $nin: bookedPropertyIds },
+      status: "active",
+      guests: { $gte: guests }, // optional filter for guest capacity
+    });
+
+    // 4. Return available properties
+    res.status(200).json({ success: true, data: availableProperties });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
 
 exports.timing = async (req, res) => {
   try {
