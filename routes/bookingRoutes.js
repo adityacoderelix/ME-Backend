@@ -65,11 +65,6 @@ router.patch(
   bookingController.terminateBooking
 );
 
-router.get(
-  "/unavailable-dates/:propertyId",
-  bookingController.getUnavailableDates
-);
-
 router.get("/check-dates/:propertyId", bookingController.checkDates);
 
 // Confirm a booking (host action)

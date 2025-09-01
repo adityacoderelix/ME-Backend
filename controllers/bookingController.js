@@ -248,93 +248,120 @@ exports.cancelAdminBooking = async (req, res) => {
   }
 };
 
-exports.getUnavailableDates = async (req, res) => {
+exports.checkDates = async (req, res) => {
   try {
     const { propertyId } = req.params;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to midnight
+
     const bookings = await Booking.find({
       propertyId,
+      checkIn: { $gte: today }, // only future or today’s checkIn
+      status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
     });
+
     const todayBooking = [];
     const datesArray = [];
-    // const unavailableDates = await getUnavailableDates(propertyId);
-    for (let i in bookings) {
-      if (
-        bookings[i].status != "cancelled" &&
-        bookings[i].status != "rejected"
-      ) {
-        const checkIn = new Date(bookings[i].checkIn);
-        const checkOut = new Date(bookings[i].checkOut);
-        if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-          return; // Skip invalid dates
-        }
 
-        const currentDate = new Date(checkIn);
+    for (const booking of bookings) {
+      const checkIn = new Date(booking.checkIn);
+      const checkOut = new Date(booking.checkOut);
 
-        const todayDate = new Date();
-        const today = new Date(todayDate.toLocaleDateString());
+      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+        continue; // skip invalid
+      }
 
-        while (currentDate <= checkOut && checkIn >= today) {
-          const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
+      const currentDate = new Date(checkIn);
 
-          datesArray.push(formattedDate);
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        const newdate = new Date(checkIn.toLocaleDateString())
-          .toISOString()
-          .split("T")[0];
-
-        if (newdate == today.toISOString().split("T")[0]) {
-          const next = new Date(checkOut);
-          if (!todayBooking.includes(next)) {
-            todayBooking.push(next.setDate(next.getDate() + 1));
+      while (currentDate <= checkOut && checkIn >= today) {
+        const formattedDate = currentDate.toISOString().split("T")[0];
+        if (formattedDate !== checkOut.toISOString().split("T")[0]) {
+          if (!datesArray.includes(formattedDate)) {
+            datesArray.push(formattedDate);
           }
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Special case: if booking starts today
+      const newdate = checkIn.toISOString().split("T")[0];
+      if (newdate === today.toISOString().split("T")[0]) {
+        const next = new Date(checkOut);
+        next.setDate(next.getDate() + 1);
+        const formattedNext = next.toISOString().split("T")[0];
+        if (!todayBooking.includes(formattedNext)) {
+          todayBooking.push(formattedNext);
         }
       }
     }
 
-    console.log("datear", datesArray);
+    console.log("final output", datesArray);
     res.json({ success: true, data: datesArray, today: todayBooking });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-exports.checkDates = async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    const bookings = await Booking.find({
-      propertyId,
-      status: "confirmed",
-    });
-    const datesArray = [];
-    // const unavailableDates = await getUnavailableDates(propertyId);
-    for (let i in bookings) {
-      const checkIn = new Date(bookings[i].checkIn);
-      const checkOut = new Date(bookings[i].checkOut);
-      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-        return; // Skip invalid dates
-      }
-      console.log("gok", bookings[i].checkIn);
-      const currentDate = new Date(checkIn);
-      console.log("gok2", currentDate);
-      const todayDate = new Date();
-      const today = new Date(todayDate.toLocaleDateString());
-      console.log("gok3", today);
-      while (currentDate <= checkOut && checkIn >= today) {
-        console.log("gok4", bookings[i].checkIn);
-        const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
-        console.log("axax", formattedDate);
-        datesArray.push(formattedDate);
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-    }
-    console.log("datear", datesArray);
-    res.json({ success: true, data: datesArray });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+// exports.checkDates = async (req, res) => {
+//   try {
+//     const { propertyId } = req.params;
+
+//     const date = new Date();
+//     date.setHours(0, 0, 0, 0); // normalize to midnight
+
+//     const bookings = await Booking.find({
+//       propertyId,
+//       checkIn: { $gte: date }, // only future or today’s checkIn
+//       status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
+//     });
+
+//     const todayBooking = [];
+//     const datesArray = [];
+
+//     const todayDate = new Date();
+//     const today = new Date(todayDate.toLocaleDateString());
+
+//     // const unavailableDates = await getUnavailableDates(propertyId);
+//     for (const i of bookings) {
+//       const checkIn = new Date(bookings[i].checkIn);
+//       const checkOut = new Date(bookings[i].checkOut);
+//       if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+//         return; // Skip invalid dates
+//       }
+
+//       const currentDate = new Date(checkIn);
+//       console.log("haya", currentDate, checkOut);
+//       while (currentDate <= checkOut && checkIn >= today) {
+//         const formattedDate = currentDate.toISOString().split("T")[0]; // Alternative method
+//         if (
+//           currentDate.toISOString().split("T")[0] !==
+//           checkOut.toISOString().split("T")[0]
+//         ) {
+//           datesArray.push(formattedDate);
+//         }
+//         currentDate.setDate(currentDate.getDate() + 1);
+//       }
+
+//       const newdate = new Date(checkIn.toLocaleDateString())
+//         .toISOString()
+//         .split("T")[0];
+
+//       if (newdate == today.toISOString().split("T")[0]) {
+//         const next = new Date(checkOut);
+//         if (!todayBooking.includes(next)) {
+//           todayBooking.push(next.setDate(next.getDate() + 1));
+//         }
+//       }
+//     }
+
+//     console.log("final outpu", datesArray);
+//     res.json({ success: true, data: datesArray, today: todayBooking });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 //Cancel a booking (host)
 exports.terminateBooking = async (req, res) => {
   try {
