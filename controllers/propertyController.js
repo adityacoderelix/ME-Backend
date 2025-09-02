@@ -12,8 +12,8 @@ const { default: mongoose } = require("mongoose");
 
 exports.getCustomSearch = async (req, res) => {
   try {
-    const { from, to, guests } = req.query;
-
+    const { location, from, to, guests } = req.query;
+    console.log("");
     const checkin = new Date(from);
     const checkout = new Date(to);
 
@@ -35,9 +35,26 @@ exports.getCustomSearch = async (req, res) => {
       status: "active",
       guests: { $gte: guests }, // optional filter for guest capacity
     });
+    function filter(users) {
+      return users.filter((property) => {
+        const matchesSearch =
+          property?.address?.district
+            ?.toLowerCase()
+            .includes(location.toLowerCase()) ||
+          property?.address?.city
+            ?.toLowerCase()
+            .includes(location.toLowerCase()) ||
+          (property?.address?.state)
+            .toLowerCase()
+            .includes(location.toLowerCase());
 
+        return matchesSearch;
+      });
+    }
+
+    const final = filter(availableProperties);
     // 4. Return available properties
-    res.status(200).json({ success: true, data: availableProperties });
+    res.status(200).json({ success: true, data: final });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
