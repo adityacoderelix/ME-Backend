@@ -205,6 +205,45 @@ exports.cancelBooking = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Booking not found" });
 
+    const instance = new Razorpay({ key_id: key, key_secret: secret });
+    let refundSuccessful = false;
+
+    const paymentData = await Payment.findOneAndUpdate(
+      { bookingId: bookingId },
+      { status: "refund initiated" },
+      { new: true }
+    );
+    console.log("batm1");
+    const payment = await Payment.findOne({ bookingId: bookingId });
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment refund initiation failed",
+      });
+    }
+    console.log("batm2");
+    const refund = await instance.payments.refund(payment.paymentId, {
+      amount: payment.amount,
+      speed: "normal",
+      notes: { notes_key_1: "Full Refund" },
+      receipt: `Refund No. ${bookingId}`,
+    });
+    console.log("batm3");
+    if (!refund) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment refund failed" });
+    }
+    console.log("batm4");
+    refundSuccessful = true;
+
+    // Update statuses only if refund is successful
+    await Payment.findOneAndUpdate(
+      { bookingId: bookingId },
+      { status: "refunded" }
+    );
+    await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
+
     const adminEmail = "majesticescape.in@gmail.com";
     await sendEmail(userEmail, 11, params);
     // await sendEmail(adminEmail, 16, params);
@@ -222,6 +261,10 @@ exports.cancelAdminBooking = async (req, res) => {
     const booking = await Booking.findByIdAndUpdate(bookingId, {
       status: "cancelled",
     });
+    if (!booking)
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     const data = await Booking.findById(bookingId).populate("userId hostId");
     if (!data) {
       return res
@@ -231,18 +274,59 @@ exports.cancelAdminBooking = async (req, res) => {
     const userName = data?.userId?.firstName + " " + data?.userId?.lastName;
     const hostName = data?.hostId?.firstName + " " + data?.hostId?.lastName;
 
-    const params = { userName: userName, hostName: hostName };
-    if (!booking)
+    const instance = new Razorpay({ key_id: key, key_secret: secret });
+    let refundSuccessful = false;
+
+    const paymentData = await Payment.findOneAndUpdate(
+      { bookingId: bookingId },
+      { status: "refund initiated" },
+      { new: true }
+    );
+    console.log("batm1");
+    const payment = await Payment.findOne({ bookingId: bookingId });
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment refund initiation failed",
+      });
+    }
+    console.log("batm2");
+    const refund = await instance.payments.refund(payment.paymentId, {
+      amount: payment.amount,
+      speed: "normal",
+      notes: { notes_key_1: "Full Refund" },
+      receipt: `Refund No. ${bookingId}`,
+    });
+    console.log("batm3");
+    if (!refund) {
       return res
         .status(404)
-        .json({ success: false, message: "Booking not found" });
+        .json({ success: false, message: "Payment refund failed" });
+    }
+    console.log("batm4");
+    refundSuccessful = true;
+
+    // Update statuses only if refund is successful
+    await Payment.findOneAndUpdate(
+      { bookingId: bookingId },
+      { status: "refunded" }
+    );
+    await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
+    const params = { userName: userName, hostName: hostName };
+
     const userEmail = data?.userId?.email;
     const hostEmail = data?.hostId?.email;
     const adminEmail = "majesticescape.in@gmail.com";
     await sendEmail(userEmail, 32, params);
     // await sendEmail(adminEmail, 31, params);
     await sendEmail(hostEmail, 33, params);
-    res.status(200).json({ success: true, data: booking });
+    res.status(200).json({
+      success: true,
+      message: refundSuccessful
+        ? "Refund issued and booking terminated"
+        : "Booking cancelled without refund",
+      data: booking,
+    });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -374,7 +458,44 @@ exports.terminateBooking = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Booking not found" });
+    const instance = new Razorpay({ key_id: key, key_secret: secret });
+    let refundSuccessful = false;
 
+    const paymentData = await Payment.findOneAndUpdate(
+      { bookingId: bookingId },
+      { status: "refund initiated" },
+      { new: true }
+    );
+    console.log("batm1");
+    const payment = await Payment.findOne({ bookingId: bookingId });
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment refund initiation failed",
+      });
+    }
+    console.log("batm2");
+    const refund = await instance.payments.refund(payment.paymentId, {
+      amount: payment.amount,
+      speed: "normal",
+      notes: { notes_key_1: "Full Refund" },
+      receipt: `Refund No. ${bookingId}`,
+    });
+    console.log("batm3");
+    if (!refund) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment refund failed" });
+    }
+    console.log("batm4");
+    refundSuccessful = true;
+
+    // Update statuses only if refund is successful
+    await Payment.findOneAndUpdate(
+      { bookingId: bookingId },
+      { status: "refunded" }
+    );
+    await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
     const adminEmail = "majesticescape.in@gmail.com";
 
     await sendEmail(userEmail, 13, params);
@@ -487,6 +608,91 @@ exports.terminateBooking = async (req, res) => {
 //   }
 // };
 exports.terminateUserBooking = async (req, res) => {
+  try {
+    const { bookingId, userEmail, hostEmail, userName, hostName } = req.body;
+    const ObjectId = require("mongoose").Types.ObjectId;
+    const id = new ObjectId(`${bookingId}`);
+
+    const booking = await Booking.findByIdAndUpdate(bookingId, {
+      status: "cancelled",
+    });
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const bookingData = await Booking.findById(bookingId);
+    if (!bookingData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Check Out date not found" });
+    }
+
+    const futureDate = new Date(bookingData?.checkIn);
+    const now = new Date();
+    const differenceInSeconds = (futureDate - now) / 1000;
+
+    const instance = new Razorpay({ key_id: key, key_secret: secret });
+
+    let refundSuccessful = false;
+
+    if (
+      (bookingData.cancellationPolicy === "moderate" &&
+        differenceInSeconds >= moderate) ||
+      (bookingData.cancellationPolicy === "flexible" &&
+        differenceInSeconds >= flexible)
+    ) {
+      const paymentData = await Payment.findOneAndUpdate(
+        { bookingId: id },
+        { status: "refund initiated" },
+        { new: true }
+      );
+      const payment = await Payment.findOne({ bookingId: id });
+      if (!payment) {
+        return res.status(404).json({
+          success: false,
+          message: "Payment refund initiation failed",
+        });
+      }
+
+      const refund = await instance.payments.refund(payment.paymentId, {
+        amount: payment.amount,
+        speed: "normal",
+        notes: { notes_key_1: "Full Refund" },
+        receipt: `Refund No. ${bookingId}`,
+      });
+
+      if (!refund) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Payment refund failed" });
+      }
+
+      refundSuccessful = true;
+
+      // Update statuses only if refund is successful
+      await Payment.findOneAndUpdate({ bookingId: id }, { status: "refunded" });
+      await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
+    }
+
+    // Email Notifications
+    const params = { userName, hostName };
+    await sendEmail(userEmail, 22, params);
+    await sendEmail(hostEmail, 20, params);
+
+    res.status(200).json({
+      success: true,
+      message: refundSuccessful
+        ? "Refund issued and booking terminated"
+        : "Booking cancelled without refund",
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+exports.terminateNonUserBooking = async (req, res) => {
   try {
     const { bookingId, userEmail, hostEmail, userName, hostName } = req.body;
     const ObjectId = require("mongoose").Types.ObjectId;
@@ -698,8 +904,8 @@ exports.confirmInstantBooking = async (req, res) => {
 
     const adminEmail = "majesticescape.in@gmail.com";
 
-    await sendEmail(userEmail, 35, params);
-    await sendEmail(hostEmail, 34, params);
+    // await sendEmail(userEmail, 35, params);
+    // await sendEmail(hostEmail, 34, params);
     // await sendEmail(adminEmail, 36, params);
     // (async function () {
     //   try {
@@ -719,7 +925,7 @@ exports.confirmInstantBooking = async (req, res) => {
 // Mark booking as paid
 exports.markBookingAsPaid = async (req, res) => {
   try {
-    const { bookingId, hostEmail, userId } = req.body;
+    const { bookingId, hostEmail, userId, manual } = req.body;
 
     const booking = await Booking.findByIdAndUpdate(bookingId, {
       paymentStatus: "paid",
@@ -730,8 +936,26 @@ exports.markBookingAsPaid = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Booking not found" });
 
-    // await sendEmail("majesticescape.in@gmail.com", 9);
-    await sendEmail(hostEmail, 8);
+    const data = await User.findById(userId);
+    if (!data)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+
+    const userEmail = await data.email;
+
+    const adminEmail = "majesticescape.in@gmail.com";
+
+    if (manual) {
+      await sendEmail(hostEmail, 8);
+
+      // await sendEmail("majesticescape.in@gmail.com", 9);
+      return res.status(200).json({ success: true, data: booking });
+    }
+
+    await sendEmail(userEmail, 35);
+    await sendEmail(hostEmail, 34);
+    // await sendEmail(adminEmail, 36);
     res.status(200).json({ success: true, data: booking });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

@@ -27,6 +27,16 @@ const authMiddleware = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Auth Middleware Error:", error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        code: "AUTH_TOKEN_EXPIRED",
+        message: "Token expired",
+        statusCode: 401,
+        requestType: req.method,
+      });
+    }
+
     return res.status(403).json({
       success: false,
       code: "AUTH_TOKEN_INVALID",

@@ -44,6 +44,21 @@ const bookingSchema = new mongoose.Schema({
   nights: {
     type: Number,
   },
+  guestData: {
+    adults: [
+      {
+        name: { type: String, required: true },
+        age: { type: Number, required: false }, // Optional for adults
+      },
+    ],
+    children: [
+      {
+        name: { type: String, required: true },
+        age: { type: Number, required: true }, // Usually required for kids
+      },
+    ],
+  },
+
   reviewed: {
     type: Boolean,
     default: false,
