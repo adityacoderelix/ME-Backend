@@ -10,72 +10,173 @@ const {
 const User = require("../models/User");
 const { default: mongoose } = require("mongoose");
 
+// exports.getCustomSearch = async (req, res) => {
+//   try {
+//     const { location, from, to, guests, propertyType } = req.query;
+
+//     const checkin = new Date(from);
+//     const checkout = new Date(to);
+
+//     const bookings = await Booking.find({
+//       $or: [
+//         {
+//           checkIn: { $lte: checkout },
+//           checkOut: { $gte: checkin },
+//         }, // overlapping condition
+//       ],
+//     }).select("propertyId"); // only fetch propertyId
+
+//     console.log("big big", propertyType);
+//     // 2. Collect booked property IDs
+//     const bookedPropertyIds = bookings.map((b) => b.propertyId);
+
+//     function filter(users) {
+//       return users.filter((property) => {
+//         const matchesSearch =
+//           property?.address?.district
+//             ?.toLowerCase()
+//             .includes(location.toLowerCase()) ||
+//           property?.address?.city
+//             ?.toLowerCase()
+//             .includes(location.toLowerCase()) ||
+//           (property?.address?.state)
+//             .toLowerCase()
+//             .includes(location.toLowerCase());
+
+//         const checkProperty = property?.propertyType
+//           ?.toLowerCase()
+//           .includes(propertyType?.toLowerCase());
+
+//         return matchesSearch && checkProperty;
+//       });
+//     }
+
+//     if (!guests) {
+//       const availableHousing = await ListingProperty.find({
+//         _id: { $nin: bookedPropertyIds },
+//         status: "active",
+//         // optional filter for guest capacity
+//       });
+
+//       const final = filter(availableHousing);
+//       res.status(200).json({ success: true, data: final });
+//     } else {
+//       // 3. Find properties that are NOT booked in this date range
+//       const availableProperties = await ListingProperty.find({
+//         _id: { $nin: bookedPropertyIds },
+//         status: "active",
+//         guests: { $gte: guests }, // optional filter for guest capacity
+//       });
+//       const final = filter(availableProperties);
+//       res.status(200).json({ success: true, data: final });
+//     }
+//     // 4. Return available properties
+//   } catch (error) {
+//     res.status(400).json({ success: false, error: error.message });
+//   }
+// };
+
 exports.getCustomSearch = async (req, res) => {
   try {
     const { location, from, to, guests, propertyType } = req.query;
 
-    const checkin = new Date(from);
-    const checkout = new Date(to);
+    // Build the base filter with status always active
+    let filter = { status: "active" };
 
-    const bookings = await Booking.find({
-      $or: [
-        {
-          checkIn: { $lte: checkout },
-          checkOut: { $gte: checkin },
-        }, // overlapping condition
-      ],
-    }).select("propertyId"); // only fetch propertyId
+    // Initialize bookedPropertyIds as empty array (will be populated if dates are provided)
+    let bookedPropertyIds = [];
 
-    console.log("big big", propertyType);
-    // 2. Collect booked property IDs
-    const bookedPropertyIds = bookings.map((b) => b.propertyId);
+    // 1. Handle date filtering only if both from and to are provided
+    if (from && to) {
+      const checkin = new Date(from);
+      const checkout = new Date(to);
 
-    function filter(users) {
-      return users.filter((property) => {
-        const matchesSearch =
-          property?.address?.district
-            ?.toLowerCase()
-            .includes(location.toLowerCase()) ||
-          property?.address?.city
-            ?.toLowerCase()
-            .includes(location.toLowerCase()) ||
-          (property?.address?.state)
-            .toLowerCase()
-            .includes(location.toLowerCase());
+      // Validate dates
+      if (isNaN(checkin.getTime()) || isNaN(checkout.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid date format",
+        });
+      }
 
-        const checkProperty = property?.propertyType
-          ?.toLowerCase()
-          .includes(propertyType?.toLowerCase());
+      const bookings = await Booking.find({
+        $or: [
+          {
+            checkIn: { $lte: checkout },
+            checkOut: { $gte: checkin },
+          }, // overlapping condition
+        ],
+      }).select("propertyId");
 
-        return matchesSearch && checkProperty;
+      bookedPropertyIds = bookings.map((b) => b.propertyId);
+      filter._id = { $nin: bookedPropertyIds };
+    }
+
+    // 2. Handle guest capacity filtering (if provided)
+    if (guests) {
+      filter.guests = { $gte: parseInt(guests) };
+    }
+
+    // 3. Handle property type filtering (if provided)
+    if (
+      propertyType &&
+      propertyType !== "null" &&
+      propertyType !== "undefined"
+    ) {
+      filter.propertyType = {
+        $regex: new RegExp(propertyType, "i"),
+      };
+    }
+
+    // 4. Find properties based on the built filter
+    const availableProperties = await ListingProperty.find(filter);
+
+    // 5. Handle location filtering (if provided) - using JavaScript filter for more complex matching
+    let filteredProperties = availableProperties;
+
+    if (location && location !== "null" && location !== "undefined") {
+      filteredProperties = availableProperties.filter((property) => {
+        const propertyLocation = property.address || {};
+        return (
+          (propertyLocation.district &&
+            propertyLocation.district
+              .toLowerCase()
+              .includes(location.toLowerCase())) ||
+          (propertyLocation.city &&
+            propertyLocation.city
+              .toLowerCase()
+              .includes(location.toLowerCase())) ||
+          (propertyLocation.state &&
+            propertyLocation.state
+              .toLowerCase()
+              .includes(location.toLowerCase()))
+        );
       });
     }
 
-    if (!guests) {
-      const availableHousing = await ListingProperty.find({
-        _id: { $nin: bookedPropertyIds },
-        status: "active",
-        // optional filter for guest capacity
-      });
+    console.log(
+      `Found ${filteredProperties.length} properties matching the criteria`
+    );
 
-      const final = filter(availableHousing);
-      res.status(200).json({ success: true, data: final });
-    } else {
-      // 3. Find properties that are NOT booked in this date range
-      const availableProperties = await ListingProperty.find({
-        _id: { $nin: bookedPropertyIds },
-        status: "active",
-        guests: { $gte: guests }, // optional filter for guest capacity
-      });
-      const final = filter(availableProperties);
-      res.status(200).json({ success: true, data: final });
-    }
-    // 4. Return available properties
+    res.status(200).json({
+      success: true,
+      data: filteredProperties,
+      filtersApplied: {
+        location: !!location,
+        dates: !!(from && to),
+        guests: !!guests,
+        propertyType: !!propertyType,
+      },
+    });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    console.error("Search error:", error);
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
-
+console;
 exports.timing = async (req, res) => {
   try {
     const { checkinTime, checkoutTime, propertyId } = req.body;
