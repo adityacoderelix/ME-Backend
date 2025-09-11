@@ -78,7 +78,23 @@ const { default: mongoose } = require("mongoose");
 
 exports.getCustomSearch = async (req, res) => {
   try {
-    const { location, from, to, guests, propertyType } = req.query;
+    const {
+      location,
+      from,
+      to,
+      guests,
+      propertyType,
+      minPrice,
+      maxPrice,
+      placeType,
+      beds,
+      bedrooms,
+      bathrooms,
+      checkinType,
+      bookingType,
+      pets,
+      amenities,
+    } = req.query;
 
     // Build the base filter with status always active
     let filter = { status: "active" };
@@ -86,6 +102,49 @@ exports.getCustomSearch = async (req, res) => {
     // Initialize bookedPropertyIds as empty array (will be populated if dates are provided)
     let bookedPropertyIds = [];
 
+    if (placeType) {
+      if (placeType.toLowerCase() == "entire_place") {
+        filter.placeType = "entire";
+      } else if (placeType.toLowerCase() == "room") {
+        filter.placeType = "room";
+      } else {
+        filter.placeType = { $in: ["entire", "room"] };
+      }
+    }
+
+    if (minPrice && maxPrice) {
+      filter.basePrice = { $gte: minPrice, $lte: maxPrice };
+    }
+
+    if (beds) {
+      filter.beds = parseInt(beds);
+    }
+
+    if (bathrooms) {
+      filter.bathrooms = pasreInt(bathrooms);
+    }
+
+    if (bedrooms) {
+      filter.bedrooms = parseInt(bedrooms);
+    }
+
+    if (bookingType) {
+      filter["bookingType.instantBook"] = true;
+    }
+
+    if (checkinType) {
+      filter.occupancy = "self-check-in";
+    }
+
+    if (pets) {
+      filter.selectedRules = "no_pets";
+    }
+
+    if (amenities) {
+      filter.amenities = { $in: amenities };
+    }
+
+    console.log("amenities", filter);
     // 1. Handle date filtering only if both from and to are provided
     if (from && to) {
       const checkin = new Date(from);
@@ -176,7 +235,7 @@ exports.getCustomSearch = async (req, res) => {
     });
   }
 };
-console;
+
 exports.timing = async (req, res) => {
   try {
     const { checkinTime, checkoutTime, propertyId } = req.body;
