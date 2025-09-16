@@ -9,8 +9,25 @@ router.post("/", authMiddleware, bookingController.createBooking);
 router.get("/", authMiddleware, bookingController.getAllBookings);
 
 // Get all filtered booking (host side)
-router.get("/filter", authMiddleware, bookingController.getAllFilterBookings);
+router.get(
+  "/filter",
+  authMiddleware,
+  bookingController.getAnalyticsFilterBookings
+);
 
+router.get(
+  "/analytics-filter",
+  authMiddleware,
+  bookingController.getAllFilterBookings
+);
+
+router.get(
+  "/filter-active-bookings",
+  authMiddleware,
+  bookingController.getActiveBookings
+);
+
+router.get("/hostEmails", bookingController.getAllHostEmails);
 //Get all bookings (user)
 router.get("/data", authMiddleware, bookingController.getAllUserBookings);
 

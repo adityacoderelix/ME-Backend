@@ -610,7 +610,7 @@ exports.getPropertyById = async (req, res) => {
     const property = await ListingProperty.findById(req.params.id).populate(
       "host"
     );
-    console.log(property);
+    console.log("si", property);
     if (!property) {
       return res.status(404).json({ message: "Property not found" });
     }
@@ -620,6 +620,25 @@ exports.getPropertyById = async (req, res) => {
   }
 };
 
+exports.getActivePropertyById = async (req, res) => {
+  try {
+    const hostId = req.params.id;
+
+    const filter = {
+      host: hostId,
+      status: "active",
+    };
+
+    const property = await ListingProperty.find(filter);
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+    res.status(200).json({ success: true, data: property });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 exports.createProperty = async (req, res) => {
   try {
     const property = new Property(req.body);

@@ -1,4 +1,5 @@
 const Booking = require("../models/Booking");
+
 const Payment = require("../models/Payment");
 const jwt = require("jsonwebtoken");
 const ListingProperty = require("../models/ListingProperty");
@@ -34,99 +35,181 @@ exports.createBooking = async (req, res) => {
 // Get all bookings (admin or host-specific)
 exports.getAllBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find().populate("userId propertyId hostId");
+    const bookings = await Booking.find({ source: "local" }).populate(
+      "userId propertyId hostId"
+    );
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
+exports.getAnalyticsFilterBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({ source: "local" }).populate(
+      "userId propertyId hostId"
+    );
+    res.status(200).json({ success: true, data: bookings });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
 // Get all filtered bookings (host-specific)
+// exports.getAllFilterBookings = async (req, res) => {
+//   try {
+//     const { search, status, from, to } = req.query;
+//     console.log("daysof", search, status, from, to);
+//     const bookings = await Booking.find({ source: "local" })
+//       .populate("userId propertyId hostId")
+//       .sort({ createdAt: -1 });
+
+//     console.log("what is", from, to);
+//     function filter(users) {
+//       return users.filter((booking) => {
+//         const matchesSearch =
+//           booking.userId?.firstName
+//             ?.toLowerCase()
+//             .includes(search.toLowerCase()) ||
+//           booking.userId?.lastName
+//             ?.toLowerCase()
+//             .includes(search.toLowerCase()) ||
+//           (booking.userId?.firstName + " " + booking.userId?.lastName)
+//             .toLowerCase()
+//             .includes(search.toLowerCase()) ||
+//           booking.propertyId?.title
+//             ?.toLowerCase()
+//             .includes(search.toLowerCase());
+
+//         const matchesDate = from
+//           ? new Date(booking.checkIn) >= new Date(from) &&
+//             new Date(booking.checkIn) <= new Date()
+//           : new Date(booking.checkIn) >= new Date(from);
+
+//         const matchesStatus =
+//           status.toLowerCase() === "all"
+//             ? "true"
+//             : booking.status?.toLowerCase() === status.toLowerCase();
+
+//         return matchesSearch && matchesDate && matchesStatus;
+//       });
+//     }
+
+//     const final = filter(bookings);
+//     res.json({ success: true, data: final,});
+
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
 exports.getAllFilterBookings = async (req, res) => {
   try {
-    const { search, status, from, to } = req.query;
-    console.log("daysof", search, status, from, to);
-    const bookings = await Booking.find()
-      .populate("userId propertyId hostId")
-      .sort({ createdAt: -1 });
+    const { search, status, from, to, title, hostEmail } = req.query;
+    console.log("rub", title);
+    const filter = { source: "local" };
 
-    // function filter(users) {
-    //   const data = users.filter((booking) =>
-    //     status != "all"
-    //       ? (booking.userId?.firstName
-    //           ?.toLowerCase()
-    //           .includes(search.toLowerCase()) ||
-    //           booking.userId?.lastName
-    //             ?.toLowerCase()
-    //             .includes(search.toLowerCase()) ||
-    //           (booking.userId?.firstName + " " + booking.userId?.lastName)
-    //             .toLowerCase()
-    //             .includes(search.toLowerCase()) ||
-    //           booking.propertyId?.title
-    //             ?.toLowerCase()
-    //             .includes(search.toLowerCase())) &&
-    //         new Date(booking.checkIn) >= new Date(from) &&
-    //         new Date(booking.checkOut) <= new Date(to)
-    //       : booking.userId?.firstName
-    //           ?.toLowerCase()
-    //           .includes(search.toLowerCase()) ||
-    //         booking.userId?.lastName
-    //           ?.toLowerCase()
-    //           .includes(search.toLowerCase()) ||
-    //         (booking.userId?.firstName + " " + booking.userId?.lastName)
-    //           .toLowerCase()
-    //           .includes(search.toLowerCase()) ||
-    //         booking.propertyId?.title
-    //           ?.toLowerCase()
-    //           .includes(search.toLowerCase()) ||
-    //         (new Date(booking.checkIn) >= new Date(from) &&
-    //           booking.status.toLowerCase() == status.toLowerCase())
-    //   );
-    //   return data;
-    // }
-    function filter(users) {
-      return users.filter((booking) => {
-        const matchesSearch =
-          booking.userId?.firstName
-            ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
-          booking.userId?.lastName
-            ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
-          (booking.userId?.firstName + " " + booking.userId?.lastName)
-            .toLowerCase()
-            .includes(search.toLowerCase()) ||
-          booking.propertyId?.title
-            ?.toLowerCase()
-            .includes(search.toLowerCase());
-
-        const matchesDate = to
-          ? new Date(booking.checkIn) >= new Date(from) &&
-            new Date(booking.checkOut) <= new Date(to)
-          : new Date(booking.checkIn) >= new Date(from);
-
-        const matchesStatus =
-          status.toLowerCase() === "all"
-            ? "true"
-            : booking.status?.toLowerCase() === status.toLowerCase();
-
-        return matchesSearch && matchesDate && matchesStatus;
-      });
+    if (status && status.toLowerCase() !== "all") {
+      filter.status = { $regex: new RegExp(status, "i") };
     }
 
-    const final = filter(bookings);
-    res.json({ success: true, data: final });
+    if (from || to) {
+      filter.checkIn = {};
+      if (from) filter.checkIn.$gte = new Date(from);
+      if (to) filter.checkIn.$lte = new Date(to);
+    }
 
-    // const bookings = await Booking.find().populate("userId propertyId hostId");
-    // res.status(200).json({ success: true, data: bookings });
+    // Fetch bookings first
+    let bookings = await Booking.find(filter)
+      .populate("userId propertyId hostId")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Apply property title & user search in JS
+
+    if (title && title.toLowerCase() !== "all") {
+      bookings = bookings.filter((item) =>
+        item.propertyId?.title?.toLowerCase().includes(title.toLowerCase())
+      );
+    }
+
+    if (hostEmail && hostEmail.toLowerCase() !== "all") {
+      bookings = bookings.filter((item) =>
+        item.hostId?.email?.toLowerCase().includes(hostEmail.toLowerCase())
+      );
+    }
+
+    if (search) {
+      const s = search.toLowerCase();
+      bookings = bookings.filter((b) =>
+        b.propertyId?.title?.toLowerCase().includes(s)
+      );
+    }
+
+    res.json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
+exports.getActiveBookings = async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    // End of the day (11:59:59 PM)
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const now = new Date();
+    // Query: checkIn <= endOfDay AND checkOut >= startOfDay
+    const bookings = await Booking.find({
+      checkIn: { $lte: endOfDay },
+      checkOut: { $gte: startOfDay },
+    }).populate("userId propertyId hostId");
+
+    const bookingData = bookings.filter((item) => {
+      if (!item.propertyId?.checkinTime || !item.propertyId?.checkoutTime) {
+        return false; // skip if property has no time info
+      }
+
+      // Build full datetime objects for checkin & checkout
+      const checkinDateTime = new Date(item.checkIn);
+      checkinDateTime.setHours(item.propertyId.checkinTime, 0, 0, 0);
+
+      const checkoutDateTime = new Date(item.checkOut);
+      checkoutDateTime.setHours(item.propertyId.checkoutTime, 0, 0, 0);
+
+      // Current time must fall between checkin and checkout datetimes
+      return now >= checkinDateTime && now <= checkoutDateTime;
+    });
+
+    res.json({ success: true, data: bookingData });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getAllHostEmails = async (req, res) => {
+  const emails = await ListingProperty.find({
+    status: "active",
+  });
+  if (!emails) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Host email not found" });
+  }
+
+  res.status(200).json({ success: true, data: emails });
+};
 exports.getAllUserBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find().populate("userId propertyId hostId");
+    const bookings = await Booking.find({ source: "local" }).populate(
+      "userId propertyId hostId"
+    );
+    if (!bookings) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -136,9 +219,10 @@ exports.getAllUserBookings = async (req, res) => {
 // Get bookings for a specific user
 exports.getBookingsByUser = async (req, res) => {
   try {
-    const bookings = await Booking.find({ userId: req.params.userId }).populate(
-      "propertyId hostId"
-    );
+    const bookings = await Booking.find({
+      userId: req.params.userId,
+      source: "local",
+    }).populate("propertyId hostId");
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -148,9 +232,10 @@ exports.getBookingsByUser = async (req, res) => {
 // Get bookings for a specific host
 exports.getBookingsByHost = async (req, res) => {
   try {
-    const bookings = await Booking.find({ hostId: req.params.hostId }).populate(
-      "userId propertyId"
-    );
+    const bookings = await Booking.find({
+      hostId: req.params.hostId,
+      source: "local",
+    }).populate("userId propertyId");
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
