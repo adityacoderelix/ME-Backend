@@ -109,6 +109,8 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const panKycRoutes = require("./routes/panKycRoutes");
 const propertyRegistrationNoRoutes = require("./routes/propertyRegistrationNoRoutes");
 const hostRoutes = require("./routes/hostRoutes");
+const calendarSyncRoutes = require("./routes/calendarSyncRoutes");
+
 // const voterKycRoutes = require("./routes/voterKycRoutes");
 // const passportKycRoutes = require("./routes/passportKycRoutes");
 // const gstKycRoutes = require("./routes/gstKycRoutes");
@@ -150,7 +152,7 @@ app.use("/api/v1/pan-kyc", panKycRoutes);
 // app.use("/api/v1/passport-kyc", passportKycRoutes);
 // app.use("/api/v1/gst-kyc", gstKycRoutes);
 // app.use("/api/v1/property-registration-id", propertyRegistrationIdRoutes);
-
+app.use("/api/v1/calendarSync", calendarSyncRoutes);
 // Global error handler
 app.use((err, req, res, next) => {
   console.error("Global Error Handler:", err);
