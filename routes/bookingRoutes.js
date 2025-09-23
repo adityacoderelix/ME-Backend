@@ -14,12 +14,24 @@ router.get(
   authMiddleware,
   bookingController.getAnalyticsFilterBookings
 );
+router.get(
+  "/blocked-dates/:propertyId",
 
+  bookingController.blockedDates
+);
 router.get(
   "/analytics-filter",
   authMiddleware,
   bookingController.getAllFilterBookings
 );
+
+// router.get(
+//   "/basic-filter",
+//   authMiddleware,
+//   bookingController.getBasicFilterBookings
+// );
+
+router.post("/unblock-dates/:propertyId", bookingController.unblockDates);
 
 router.get(
   "/filter-active-bookings",
@@ -52,6 +64,11 @@ router.get(
   bookingController.getBookingsByHost
 );
 
+router.get(
+  "/users-by-host",
+  authMiddleware,
+  bookingController.getBookingsByHostGroupByUsers
+);
 // Get a specific booking by ID
 router.get("/:bookingId", authMiddleware, bookingController.getBookingById);
 
