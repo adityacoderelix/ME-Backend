@@ -1,32 +1,43 @@
-const User = require('../models/User');
+const User = require("../models/User");
 
 // Get user information by ID
 exports.getGuests = async (req, res) => {
-  
-    try {
-        const users = await User.find();  // Fetch all users
-        res.json(users);
-      } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch users' });
-      }
-  };
+  try {
+    const users = await User.find(); // Fetch all users
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+};
 
-  
-  
+exports.getGuestsById = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const users = await User.findById(userId); // Fetch all users
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+};
+
 // Get user information by ID
 exports.getUserInfo = async (req, res) => {
   const { userId } = req.params;
 
   try {
     const user = await User.findById(userId)
-      .select('-otp.value -otp.expiry -lockUntil') // Exclude sensitive fields
+      .select("-otp.value -otp.expiry -lockUntil") // Exclude sensitive fields
       .lean(); // Optimize for read-only
 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json({ message: 'User information retrieved successfully', user });
+    res
+      .status(200)
+      .json({ message: "User information retrieved successfully", user });
   } catch (err) {
-    res.status(500).json({ error: 'Error fetching user information', details: err.message });
+    res
+      .status(500)
+      .json({ error: "Error fetching user information", details: err.message });
   }
 };
 
@@ -37,11 +48,13 @@ exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(userId);
 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json({ message: 'User deleted successfully', user });
+    res.status(200).json({ message: "User deleted successfully", user });
   } catch (err) {
-    res.status(500).json({ error: 'Error deleting user', details: err.message });
+    res
+      .status(500)
+      .json({ error: "Error deleting user", details: err.message });
   }
 };
 
@@ -53,17 +66,17 @@ exports.banUser = async (req, res) => {
   try {
     const user = await User.findById(userId);
 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     user.status.active = false;
     user.status.banned = true;
-    user.status.bannedReason = bannedReason || 'No reason provided';
+    user.status.bannedReason = bannedReason || "No reason provided";
 
     await user.save();
 
-    res.status(200).json({ message: 'User banned successfully', user });
+    res.status(200).json({ message: "User banned successfully", user });
   } catch (err) {
-    res.status(500).json({ error: 'Error banning user', details: err.message });
+    res.status(500).json({ error: "Error banning user", details: err.message });
   }
 };
 
@@ -74,7 +87,7 @@ exports.unbanUser = async (req, res) => {
   try {
     const user = await User.findById(userId);
 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     user.status.active = true;
     user.status.banned = false;
@@ -82,8 +95,10 @@ exports.unbanUser = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: 'User unbanned successfully', user });
+    res.status(200).json({ message: "User unbanned successfully", user });
   } catch (err) {
-    res.status(500).json({ error: 'Error unbanning user', details: err.message });
+    res
+      .status(500)
+      .json({ error: "Error unbanning user", details: err.message });
   }
 };

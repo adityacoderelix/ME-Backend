@@ -9,6 +9,7 @@ const { sendEmail } = require("../utils/sendEmail");
 const User = require("../models/User");
 const Razorpay = require("razorpay");
 const getUnavailableDates = require("../services/getUnavailableDates");
+const { blockedDates } = require("../services/blockedDates");
 const TOKEN_EXPIRATION = "14d";
 const mongoConnectionString = process.env.DB_URI;
 const baseUrl = process.env.NEXTAUTH_URL;
@@ -19,13 +20,69 @@ const secret = process.env.RAZORPAY_KEY_SECRET;
 // Create a new booking
 exports.createBooking = async (req, res) => {
   try {
-    const booking = new Booking(req.body);
+    const { propertyId, checkIn, checkOut } = req.body;
+
+    if (!propertyId || !checkIn || !checkOut) {
+      return res.status(400).json({
+        success: false,
+        message: "propertyId, checkIn and checkOut are required",
+      });
+    }
+
+    const newCheckIn = new Date(checkIn);
+    newCheckIn.setHours(0, 0, 0, 0);
+
+    const newCheckOut = new Date(checkOut);
+    newCheckOut.setHours(0, 0, 0, 0);
+
+    if (
+      Number.isNaN(newCheckIn.getTime()) ||
+      Number.isNaN(newCheckOut.getTime())
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid date format" });
+    }
+
+    if (newCheckIn >= newCheckOut) {
+      return res.status(400).json({
+        success: false,
+        message: "checkIn must be earlier than checkOut",
+      });
+    }
+
+    // Find overlapping bookings
+    const overlapping = await Booking.findOne({
+      propertyId,
+      status: { $nin: ["rejected", "cancelled"] },
+      checkIn: { $lt: newCheckOut },
+      checkOut: { $gt: newCheckIn }, // will catch overlap
+    }).lean();
+
+    if (overlapping) {
+      // ✅ Special allowance: if new checkIn == existing checkOut → allow
+      if (
+        newCheckIn.getTime() ===
+        new Date(overlapping.checkOut).setHours(0, 0, 0, 0)
+      ) {
+        // continue without blocking
+      } else {
+        return res.status(409).json({
+          success: false,
+          message: "Selected dates overlap with an existing booking",
+        });
+      }
+    }
+
+    // Save booking
+    const booking = new Booking({
+      ...req.body,
+      checkIn: newCheckIn,
+      checkOut: newCheckOut,
+    });
 
     await booking.save();
-    const { propertyId } = req.body;
-    // const host = await ListingProperty.findById(propertyId);
-    // console.log(host._id.toString());
-    // booking.hostId = host._id.toString();
+
     res.status(200).json({ success: true, data: booking });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -35,9 +92,10 @@ exports.createBooking = async (req, res) => {
 // Get all bookings (admin or host-specific)
 exports.getAllBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ source: "local" }).populate(
-      "userId propertyId hostId"
-    );
+    const bookings = await Booking.find({
+      source: "local",
+      action: "user",
+    }).populate("userId propertyId hostId");
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -46,16 +104,17 @@ exports.getAllBookings = async (req, res) => {
 
 exports.getAnalyticsFilterBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ source: "local" }).populate(
-      "userId propertyId hostId"
-    );
+    const bookings = await Booking.find({
+      source: "local",
+      action: "user",
+    }).populate("userId propertyId hostId");
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
 // Get all filtered bookings (host-specific)
-// exports.getAllFilterBookings = async (req, res) => {
+// exports.getBasicFilterBookings = async (req, res) => {
 //   try {
 //     const { search, status, from, to } = req.query;
 //     console.log("daysof", search, status, from, to);
@@ -95,8 +154,7 @@ exports.getAnalyticsFilterBookings = async (req, res) => {
 //     }
 
 //     const final = filter(bookings);
-//     res.json({ success: true, data: final,});
-
+//     res.json({ success: true, data: final });
 //   } catch (error) {
 //     res.status(500).json({ success: false, error: error.message });
 //   }
@@ -105,7 +163,7 @@ exports.getAllFilterBookings = async (req, res) => {
   try {
     const { search, status, from, to, title, hostEmail } = req.query;
     console.log("rub", title);
-    const filter = { source: "local" };
+    const filter = { source: "local", action: "user" };
 
     if (status && status.toLowerCase() !== "all") {
       filter.status = { $regex: new RegExp(status, "i") };
@@ -202,9 +260,10 @@ exports.getAllHostEmails = async (req, res) => {
 };
 exports.getAllUserBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ source: "local" }).populate(
-      "userId propertyId hostId"
-    );
+    const bookings = await Booking.find({
+      source: "local",
+      action: "user",
+    }).populate("userId propertyId hostId");
     if (!bookings) {
       return res
         .status(404)
@@ -235,9 +294,88 @@ exports.getBookingsByHost = async (req, res) => {
     const bookings = await Booking.find({
       hostId: req.params.hostId,
       source: "local",
+      action: "user",
     }).populate("userId propertyId");
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getBookingsByHostGroupByUsers = async (req, res) => {
+  try {
+    const { search, from, to, title, hostId } = req.query;
+    console.log("mys", hostId);
+    const mongoose = require("mongoose");
+
+    // 1. Build filter
+    const filter = { source: "local", action: "user", status: "confirmed" };
+
+    if (hostId && hostId.toLowerCase() != "all") {
+      filter.hostId = new mongoose.Types.ObjectId(hostId);
+    }
+
+    if (from || to) {
+      filter.checkIn = {};
+      if (from) filter.checkIn.$gte = new Date(from);
+      if (to) filter.checkIn.$lte = new Date(to);
+    }
+
+    // 2. Aggregation pipeline
+    let bookings = await Booking.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$userId",
+          totalBookings: { $sum: 1 },
+          totalAmountSpent: { $sum: "$price" },
+
+          totalReviews: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [{ $eq: ["$reviewed", true] }],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          // keep refs for populate
+          userId: { $first: "$userId" },
+        },
+      },
+      { $sort: { totalBookings: -1 } }, // sort inside pipeline
+    ]);
+    console.log("p1", bookings);
+    // 3. Populate refs
+    bookings = await Booking.populate(bookings, [
+      { path: "userId", select: "firstName lastName email averageRating" },
+      { path: "hostId", select: "email" },
+      { path: "propertyId", select: "title" },
+    ]);
+    console.log("p2", bookings);
+    // 4. Apply JS filters after populate
+    if (title && title.toLowerCase() !== "all") {
+      bookings = bookings.filter((item) =>
+        item.propertyId?.title?.toLowerCase().includes(title.toLowerCase())
+      );
+    }
+    console.log("p3", bookings);
+    if (search) {
+      const s = search.toLowerCase();
+      bookings = bookings.filter(
+        (b) =>
+          b.propertyId?.title?.toLowerCase().includes(s) ||
+          `${b.userId?.firstName} ${b.userId?.lastName}`
+            .toLowerCase()
+            .includes(s)
+      );
+    }
+
+    res.json({ success: true, data: bookings });
+  } catch (error) {
+    console.error("Error fetching bookings:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -433,37 +571,7 @@ exports.checkDates = async (req, res) => {
     const todayBooking = [];
     const datesArray = [];
 
-    for (const booking of bookings) {
-      const checkIn = new Date(booking.checkIn);
-      const checkOut = new Date(booking.checkOut);
-
-      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-        continue; // skip invalid
-      }
-
-      const currentDate = new Date(checkIn);
-
-      while (currentDate <= checkOut && checkIn >= today) {
-        const formattedDate = currentDate.toISOString().split("T")[0];
-        if (formattedDate !== checkOut.toISOString().split("T")[0]) {
-          if (!datesArray.includes(formattedDate)) {
-            datesArray.push(formattedDate);
-          }
-        }
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      // Special case: if booking starts today
-      const newdate = checkIn.toISOString().split("T")[0];
-      if (newdate === today.toISOString().split("T")[0]) {
-        const next = new Date(checkOut);
-        next.setDate(next.getDate() + 1);
-        const formattedNext = next.toISOString().split("T")[0];
-        if (!todayBooking.includes(formattedNext)) {
-          todayBooking.push(formattedNext);
-        }
-      }
-    }
+    blockedDates(bookings, datesArray, todayBooking, today);
 
     console.log("final output", datesArray);
     res.json({ success: true, data: datesArray, today: todayBooking });
@@ -472,6 +580,75 @@ exports.checkDates = async (req, res) => {
   }
 };
 
+exports.blockedDates = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to midnight
+
+    const bookings = await Booking.find({
+      propertyId,
+      checkIn: { $gte: today }, // only future or today’s checkIn
+      status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
+      action: "user",
+    });
+    const manualBlock = await Booking.find({
+      propertyId,
+      checkIn: { $gte: today }, // only future or today’s checkIn
+      status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
+      action: "host",
+    });
+    const todayBooking = [];
+    const datesArray = [];
+
+    const todayHostBooking = [];
+    const datesHostArray = [];
+    blockedDates(bookings, datesArray, todayBooking, today);
+    blockedDates(manualBlock, datesHostArray, todayHostBooking, today);
+
+    res.json({
+      success: true,
+      data: datesArray,
+      today: todayBooking,
+      blocked: datesHostArray,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+//host side unblocking dates that host blocked
+exports.unblockDates = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { selectedDate } = req.body;
+    const today = new Date(selectedDate);
+    today.setHours(0, 0, 0, 0); // normalize to midnight
+    console.log("unblock1", propertyId, selectedDate);
+    const booking = await Booking.findOne({
+      propertyId,
+      source: "local",
+      checkIn: { $lte: today }, // only future or today’s checkIn
+      checkOut: { $gt: today },
+      status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
+      action: "host",
+    }).lean();
+    console.log("unblock2", booking);
+    const unblock = await Booking.findByIdAndUpdate(
+      booking._id,
+      { status: "cancelled" },
+      { new: true }
+    );
+    console.log("unblock3", unblock);
+    res.json({
+      success: true,
+      data: unblock,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 // exports.checkDates = async (req, res) => {
 //   try {
 //     const { propertyId } = req.params;
