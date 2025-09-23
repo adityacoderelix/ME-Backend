@@ -4,6 +4,8 @@ const ListingProperty = require("../models/ListingProperty");
 const jwt = require("jsonwebtoken");
 const secret = process.env.JWT_SECRET;
 const mongoose = require("mongoose");
+const HostReview = require("../models/HostReview");
+const User = require("../models/User");
 
 // exports.submitReview = async (req, res) => {
 //   try {
@@ -196,11 +198,145 @@ exports.submitReview = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// Assumes: Booking, HostReview, User are mongoose models already required
+
+exports.submitHostReview = async (req, res) => {
+  try {
+    const { bookingId, rating, content } = req.body;
+
+    // 0) Basic validation
+    if (!bookingId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "bookingId is required" });
+    }
+    const numericRating = Number(rating);
+    if (Number.isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "rating must be a number between 1 and 5",
+      });
+    }
+
+    // 1) Find booking
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    // Optional: prevent duplicate review for same booking
+    const existing = await HostReview.findOne({ bookingId: booking._id });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "Review for this booking already exists",
+      });
+    }
+
+    // 2) Create and save review
+    const review = new HostReview({
+      bookingId: booking._id,
+      hostId: booking.hostId,
+      property: booking.propertyId,
+      user: booking.userId,
+      rating: numericRating,
+      content: content || "",
+    });
+
+    await review.save();
+
+    // 3) Update host profile: compute new average correctly
+    const host = await User.findById(booking.hostId).lean(); // read-only copy
+    if (!host) {
+      // host missing — still return review but warn
+      return res.status(201).json({
+        success: true,
+        data: review,
+        warning: "Review saved but host not found to update stats",
+      });
+    }
+
+    // Ensure host.hostProfile exists and has numeric fields
+    const oldCount = (host && Number(host.reviewCount)) || 0;
+    const oldRating = (host && Number(host.averageRating)) || 0;
+
+    const newCount = oldCount + 1;
+    // Weighted average formula:
+    const newRating = (oldRating * oldCount + numericRating) / newCount;
+
+    // 4) Save the updated host values (use $set to update nested fields)
+    const updatedHost = await User.findByIdAndUpdate(
+      booking.hostId,
+      {
+        $set: {
+          averageRating: newRating,
+          reviewCount: newCount,
+        },
+      },
+      { new: true, runValidators: true } // return updated doc
+    ).select("-password"); // avoid returning sensitive fields
+
+    // 5) Mark booking as reviewed (optional, if model supports)
+    booking.hostReviewed = true;
+    await booking.save();
+
+    // 6) Respond with created review and updated host
+    return res.status(201).json({
+      success: true,
+      data: {
+        review,
+        host: updatedHost,
+      },
+    });
+  } catch (error) {
+    console.error("Error in submitHostReview:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.checkReview = async (req, res) => {
   try {
     const { id } = req.params;
 
     const data = await Review.find({ bookingId: id });
+    console.log("supernm", data);
+    if (!data || data.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, data: false, message: "Review not found" });
+    }
+
+    res.status(201).json({ success: true, data: true });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+exports.checkReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const data = await Review.find({ bookingId: id });
+    console.log("supernm", data);
+    if (!data || data.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, data: false, message: "Review not found" });
+    }
+
+    res.status(201).json({ success: true, data: true });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+exports.checkHostReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const data = await HostReview.find({ bookingId: id });
     console.log("supernm", data);
     if (!data || data.length === 0) {
       return res

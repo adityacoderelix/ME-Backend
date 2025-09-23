@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 const bookingSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  source: { type: String, enum: ["local", "ical"], default: "local" }, // 'ical' = imported
+  action: { type: String, enum: ["user", "host"], default: "user" },
+  sourceId: { type: String, default: null }, // UID from VEVENT to dedupe imports
   propertyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ListingProperty",
@@ -60,6 +63,10 @@ const bookingSchema = new mongoose.Schema({
   },
 
   reviewed: {
+    type: Boolean,
+    default: false,
+  },
+  hostReviewed: {
     type: Boolean,
     default: false,
   },
