@@ -11,6 +11,12 @@ router.get(
   authMiddleware,
   propertyController.getActivePropertyById
 );
+router.get(
+  "/active/filter/:id",
+  authMiddleware,
+  propertyController.getFilterActivePropertyById
+);
+router.get("/admin-filter", propertyController.getAdminFilter);
 router.get("/search-properties", propertyController.getCustomSearch);
 router.get("/:id", propertyController.getPropertyById);
 router.post("/", propertyController.createProperty);

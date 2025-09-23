@@ -236,6 +236,53 @@ exports.getCustomSearch = async (req, res) => {
   }
 };
 
+exports.getAdminFilter = async (req, res) => {
+  try {
+    const { search, hostId } = req.query;
+
+    const filter = { status: "active" };
+
+    if (hostId && hostId.toLowerCase() != "all") {
+      filter.host = new mongoose.Types.ObjectId(hostId);
+    }
+    let property = await ListingProperty.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$host",
+          totalProperty: { $sum: 1 },
+          totalReviews: {
+            $sum: "$reviewCount",
+          },
+          averageRating: { $avg: "$averageRating" },
+          host: { $first: "$host" },
+          hostEmail: { $first: "$hostEmail" },
+        },
+      },
+    ]);
+
+    property = await ListingProperty.populate(property, [
+      { path: "host", select: "firstName lastName phoneNumber" },
+    ]);
+    if (search) {
+      const s = search.toLowerCase();
+      property = property.filter(
+        (b) =>
+          b.host?.phoneNumber?.toLowerCase().includes(s) ||
+          `${b.host?.firstName} ${b.host?.lastName}`.toLowerCase().includes(s)
+      );
+    }
+
+    console.log("abc", property);
+    res.json({ success: true, data: property });
+  } catch (error) {
+    console.error("Search error:", error);
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 exports.timing = async (req, res) => {
   try {
     const { checkinTime, checkoutTime, propertyId } = req.body;
@@ -633,6 +680,50 @@ exports.getActivePropertyById = async (req, res) => {
 
     if (!property) {
       return res.status(404).json({ message: "Property not found" });
+    }
+    res.status(200).json({ success: true, data: property });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getFilterActivePropertyById = async (req, res) => {
+  try {
+    const hostId = req.params.id;
+    const { search, kycStatus, propertyType } = req.query;
+    console.log("nand", search);
+    const filter = {
+      host: hostId,
+      status: "active",
+    };
+    console.log("supr", kycStatus);
+    if (kycStatus && kycStatus != "all") {
+      if (kycStatus == "completed") {
+        filter.kycStatus = kycStatus;
+      } else {
+        filter.kycStatus = { $nin: ["completed"] };
+      }
+    }
+    if (propertyType && propertyType != "all") {
+      filter.propertyType = propertyType;
+    }
+
+    let property = await ListingProperty.find(filter).populate("host");
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+    console.log("abc", property);
+    if (search) {
+      const s = search.toLowerCase();
+      property = property.filter(
+        (b) =>
+          b.title?.toLowerCase().includes(s) ||
+          b.address?.district?.toLowerCase().includes(s) ||
+          b.address?.city?.toLowerCase().includes(s) ||
+          b.address?.state?.toLowerCase().includes(s) ||
+          b.address?.pincode?.toLowerCase().includes(s)
+      );
     }
     res.status(200).json({ success: true, data: property });
   } catch (error) {
