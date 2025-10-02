@@ -262,7 +262,7 @@ exports.getAdminFilter = async (req, res) => {
     ]);
 
     property = await ListingProperty.populate(property, [
-      { path: "host", select: "firstName lastName phoneNumber" },
+      { path: "host", select: "firstName lastName phoneNumber kyc" },
     ]);
     if (search) {
       const s = search.toLowerCase();
@@ -349,7 +349,25 @@ exports.getAllStays = async (req, res) => {
     });
   }
 };
+exports.getIdandName = async (req, res) => {
+  try {
+    const filter = { status: "active" };
+    const data = await ListingProperty.find(filter);
 
+    if (!data) {
+      return res.status(404).json({ message: "Listing not found" });
+    }
+    res.status(200).json({
+      data: data,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to fetch properties",
+      error: error.message,
+    });
+  }
+};
 exports.getAllStaticProperties = async (req, res) => {
   try {
     // Get pagination parameters from query
@@ -686,23 +704,37 @@ exports.getActivePropertyById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+exports.getAllActiveProperty = async (req, res) => {
+  try {
+    const hostId = req.params.id;
+
+    const filter = {
+      status: "active",
+    };
+
+    const property = await ListingProperty.find(filter);
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+    res.status(200).json({ success: true, data: property });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 exports.getFilterActivePropertyById = async (req, res) => {
   try {
     const hostId = req.params.id;
-    const { search, kycStatus, propertyType } = req.query;
+    const { search, placeType, propertyType } = req.query;
     console.log("nand", search);
     const filter = {
       host: hostId,
       status: "active",
     };
-    console.log("supr", kycStatus);
-    if (kycStatus && kycStatus != "all") {
-      if (kycStatus == "completed") {
-        filter.kycStatus = kycStatus;
-      } else {
-        filter.kycStatus = { $nin: ["completed"] };
-      }
+
+    if (placeType && placeType != "all") {
+      filter.placeType = placeType;
     }
     if (propertyType && propertyType != "all") {
       filter.propertyType = propertyType;
