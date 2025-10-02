@@ -148,6 +148,7 @@ app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/hostData", hostRoutes);
 // KYC Routes
 app.use("/api/v1/pan-kyc", panKycRoutes);
+
 // app.use("/api/v1/voter-kyc", voterKycRoutes);
 // app.use("/api/v1/passport-kyc", passportKycRoutes);
 // app.use("/api/v1/gst-kyc", gstKycRoutes);
