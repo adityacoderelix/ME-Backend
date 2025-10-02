@@ -10,6 +10,7 @@ const User = require("../models/User");
 const Razorpay = require("razorpay");
 const getUnavailableDates = require("../services/getUnavailableDates");
 const { blockedDates } = require("../services/blockedDates");
+const { parseMDYToUTC, parseMDYToUTCBooking } = require("../utils/convertDate");
 const TOKEN_EXPIRATION = "14d";
 const mongoConnectionString = process.env.DB_URI;
 const baseUrl = process.env.NEXTAUTH_URL;
@@ -18,6 +19,78 @@ const flexible = process.env.FLEXIBLE_POLICY_DAYS * 60 * 60;
 const key = process.env.RAZORPAY_KEY_ID;
 const secret = process.env.RAZORPAY_KEY_SECRET;
 // Create a new booking
+// exports.createBooking = async (req, res) => {
+//   try {
+//     const { propertyId, checkIn, checkOut } = req.body;
+
+//     if (!propertyId || !checkIn || !checkOut) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "propertyId, checkIn and checkOut are required",
+//       });
+//     }
+
+//     const newCheckIn = new Date(checkIn);
+//     newCheckIn.setHours(0, 0, 0, 0);
+
+//     const newCheckOut = new Date(checkOut);
+//     newCheckOut.setHours(0, 0, 0, 0);
+
+//     if (
+//       Number.isNaN(newCheckIn.getTime()) ||
+//       Number.isNaN(newCheckOut.getTime())
+//     ) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Invalid date format" });
+//     }
+
+//     if (newCheckIn >= newCheckOut) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "checkIn must be earlier than checkOut",
+//       });
+//     }
+
+//     // Find overlapping bookings
+//     const overlapping = await Booking.findOne({
+//       propertyId,
+//       status: { $nin: ["rejected", "cancelled"] },
+//       checkIn: { $lt: newCheckOut },
+//       checkOut: { $gt: newCheckIn }, // will catch overlap
+//     }).lean();
+
+//     if (overlapping) {
+//       // ✅ Special allowance: if new checkIn == existing checkOut → allow
+//       console.log("S1");
+//       if (
+//         newCheckIn.getTime() ===
+//         new Date(overlapping.checkOut).setHours(0, 0, 0, 0)
+//       ) {
+//         // continue without blocking
+//       } else {
+//         return res.status(409).json({
+//           success: false,
+//           message: "Selected dates overlap with an existing booking",
+//         });
+//       }
+//     }
+//     console.log("S3");
+//     // Save booking
+//     const booking = new Booking({
+//       ...req.body,
+//       checkIn: newCheckIn,
+//       checkOut: newCheckOut,
+//     });
+
+//     await booking.save();
+
+//     res.status(200).json({ success: true, data: booking });
+//   } catch (error) {
+//     res.status(400).json({ success: false, error: error.message });
+//   }
+// };
+
 exports.createBooking = async (req, res) => {
   try {
     const { propertyId, checkIn, checkOut } = req.body;
@@ -29,12 +102,12 @@ exports.createBooking = async (req, res) => {
       });
     }
 
+    // Normalize dates
     const newCheckIn = new Date(checkIn);
-    newCheckIn.setHours(0, 0, 0, 0);
 
     const newCheckOut = new Date(checkOut);
-    newCheckOut.setHours(0, 0, 0, 0);
 
+    console.log("gobl", checkIn, checkOut);
     if (
       Number.isNaN(newCheckIn.getTime()) ||
       Number.isNaN(newCheckOut.getTime())
@@ -51,22 +124,29 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    // Find overlapping bookings
+    // Check overlaps
     const overlapping = await Booking.findOne({
       propertyId,
       status: { $nin: ["rejected", "cancelled"] },
       checkIn: { $lt: newCheckOut },
-      checkOut: { $gt: newCheckIn }, // will catch overlap
+      checkOut: { $gt: newCheckIn },
     }).lean();
 
     if (overlapping) {
-      // ✅ Special allowance: if new checkIn == existing checkOut → allow
+      const existingCheckOut = new Date(overlapping.checkOut);
+
+      console.log(
+        "gob2",
+        newCheckIn.getDate(),
+        newCheckIn.getMonth(),
+        overlapping.checkOut.getDate() - 1,
+        overlapping.checkOut.getMonth()
+      );
+      // ✅ Allow exact checkout == new checkin
       if (
-        newCheckIn.getTime() ===
-        new Date(overlapping.checkOut).setHours(0, 0, 0, 0)
+        `${newCheckIn.getDate()}/${newCheckIn.getMonth()}` !==
+        `${overlapping.checkOut.getDate() - 1}/${existingCheckOut.getMonth()}`
       ) {
-        // continue without blocking
-      } else {
         return res.status(409).json({
           success: false,
           message: "Selected dates overlap with an existing booking",
@@ -83,9 +163,10 @@ exports.createBooking = async (req, res) => {
 
     await booking.save();
 
-    res.status(200).json({ success: true, data: booking });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    return res.status(201).json({ success: true, data: booking });
+  } catch (err) {
+    console.error("createBooking error:", err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
 
@@ -162,17 +243,21 @@ exports.getAnalyticsFilterBookings = async (req, res) => {
 exports.getAllFilterBookings = async (req, res) => {
   try {
     const { search, status, from, to, title, hostEmail } = req.query;
-    console.log("rub", title);
-    const filter = { source: "local", action: "user" };
 
+    const filter = {
+      source: "local",
+      action: "user",
+    };
+    const date = parseMDYToUTC(from, to);
+    console.log("rub", title, date.from, date.to);
     if (status && status.toLowerCase() !== "all") {
       filter.status = { $regex: new RegExp(status, "i") };
     }
 
     if (from || to) {
       filter.checkIn = {};
-      if (from) filter.checkIn.$gte = new Date(from);
-      if (to) filter.checkIn.$lte = new Date(to);
+      if (from) filter.checkIn.$gte = date.from;
+      if (to) filter.checkIn.$lte = date.to;
     }
 
     // Fetch bookings first
@@ -182,7 +267,7 @@ exports.getAllFilterBookings = async (req, res) => {
       .lean();
 
     // Apply property title & user search in JS
-
+    console.log("rub2", bookings);
     if (title && title.toLowerCase() !== "all") {
       bookings = bookings.filter((item) =>
         item.propertyId?.title?.toLowerCase().includes(title.toLowerCase())
@@ -197,8 +282,14 @@ exports.getAllFilterBookings = async (req, res) => {
 
     if (search) {
       const s = search.toLowerCase();
-      bookings = bookings.filter((b) =>
-        b.propertyId?.title?.toLowerCase().includes(s)
+      bookings = bookings.filter(
+        (b) =>
+          b.propertyId?.title?.toLowerCase().includes(s) ||
+          b.userId?.firstName.toLowerCase().includes(s) ||
+          b.userId?.lastName.toLowerCase().includes(s) ||
+          (b.userId?.firstName + " " + b.userId?.lastName)
+            .toLowerCase()
+            .includes(s)
       );
     }
 
@@ -208,6 +299,77 @@ exports.getAllFilterBookings = async (req, res) => {
   }
 };
 
+exports.updateCloseModal = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    console.log("triggggg");
+    const data = await Booking.findByIdAndUpdate(bookingId, {});
+
+    res.json({ success: true, data: data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+exports.modifyBooking = async (req, res) => {
+  try {
+    const {
+      bookingId,
+      hostEmail,
+      userEmail,
+      adults,
+      children,
+      guest,
+      property,
+      from,
+      to,
+    } = req.query;
+
+    const date = parseMDYToUTCBooking(from, to);
+    const filter = {
+      guests: Number(guest),
+      adults: Number(adults),
+      checkIn: date.from,
+      checkOut: date.to,
+    };
+    if (property && property.toLowerCase() != "all") {
+      filter.propertyId = property;
+    }
+    if (children) {
+      filter.children = Number(children);
+    }
+    const data = await Booking.findByIdAndUpdate(bookingId, filter);
+    if (!data) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+    const params = { firstName: "Ad" };
+    await sendEmail(hostEmail, 40, params);
+    await sendEmail(userEmail, 40, params);
+
+    res.status(200).json({ success: true, data: data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.updateFlag = async (req, res) => {
+  try {
+    const { id, email } = req.query;
+    const data = await Booking.findByIdAndUpdate(id, { flag: true });
+    if (!data) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+    console.log(email);
+    const params = { firstName: "Ad" };
+    await sendEmail(email, 39, params);
+    res.status(200).json({ success: true, data: data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
 exports.getActiveBookings = async (req, res) => {
   try {
     const startOfDay = new Date();
@@ -281,6 +443,7 @@ exports.getBookingsByUser = async (req, res) => {
     const bookings = await Booking.find({
       userId: req.params.userId,
       source: "local",
+      action: "user",
     }).populate("propertyId hostId");
     res.status(200).json({ success: true, data: bookings });
   } catch (error) {
@@ -309,16 +472,20 @@ exports.getBookingsByHostGroupByUsers = async (req, res) => {
     const mongoose = require("mongoose");
 
     // 1. Build filter
-    const filter = { source: "local", action: "user", status: "confirmed" };
+    const filter = {
+      source: "local",
+      action: "user",
+      status: "confirmed",
+    };
 
     if (hostId && hostId.toLowerCase() != "all") {
-      filter.hostId = new mongoose.Types.ObjectId(hostId);
+      filter.userId = new mongoose.Types.ObjectId(hostId);
     }
-
+    const date = parseMDYToUTC(from, to);
     if (from || to) {
       filter.checkIn = {};
-      if (from) filter.checkIn.$gte = new Date(from);
-      if (to) filter.checkIn.$lte = new Date(to);
+      if (from) filter.checkIn.$gte = new Date(date.from);
+      if (to) filter.checkIn.$lte = new Date(date.to);
     }
 
     // 2. Aggregation pipeline
@@ -347,14 +514,14 @@ exports.getBookingsByHostGroupByUsers = async (req, res) => {
       },
       { $sort: { totalBookings: -1 } }, // sort inside pipeline
     ]);
-    console.log("p1", bookings);
+
     // 3. Populate refs
     bookings = await Booking.populate(bookings, [
-      { path: "userId", select: "firstName lastName email averageRating" },
+      { path: "userId", select: "firstName lastName email averageRating kyc" },
       { path: "hostId", select: "email" },
       { path: "propertyId", select: "title" },
     ]);
-    console.log("p2", bookings);
+
     // 4. Apply JS filters after populate
     if (title && title.toLowerCase() !== "all") {
       bookings = bookings.filter((item) =>
@@ -463,7 +630,8 @@ exports.cancelBooking = async (req, res) => {
     // Update statuses only if refund is successful
     await Payment.findOneAndUpdate(
       { bookingId: bookingId },
-      { status: "refunded" }
+      { status: "refunded" },
+      { paymentType: "refunded" }
     );
     await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
 
@@ -532,7 +700,8 @@ exports.cancelAdminBooking = async (req, res) => {
     // Update statuses only if refund is successful
     await Payment.findOneAndUpdate(
       { bookingId: bookingId },
-      { status: "refunded" }
+      { status: "refunded", paymentType: "refunded" }, // ✅ both fields updated
+      { new: true }
     );
     await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
     const params = { userName: userName, hostName: hostName };
@@ -564,6 +733,7 @@ exports.checkDates = async (req, res) => {
 
     const bookings = await Booking.find({
       propertyId,
+      paymentStatus: "paid",
       checkIn: { $gte: today }, // only future or today’s checkIn
       status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
     });
@@ -589,6 +759,7 @@ exports.blockedDates = async (req, res) => {
 
     const bookings = await Booking.find({
       propertyId,
+      paymentStatus: "paid",
       checkIn: { $gte: today }, // only future or today’s checkIn
       status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
       action: "user",
@@ -599,6 +770,7 @@ exports.blockedDates = async (req, res) => {
       status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
       action: "host",
     });
+
     const todayBooking = [];
     const datesArray = [];
 
@@ -632,6 +804,7 @@ exports.unblockDates = async (req, res) => {
       checkIn: { $lte: today }, // only future or today’s checkIn
       checkOut: { $gt: today },
       status: { $nin: ["rejected", "cancelled"] }, // exclude rejected & cancelled
+
       action: "host",
     }).lean();
     console.log("unblock2", booking);
@@ -712,6 +885,8 @@ exports.unblockDates = async (req, res) => {
 exports.terminateBooking = async (req, res) => {
   try {
     const { bookingId, userEmail, hostEmail, userName, hostName } = req.body;
+    const ObjectId = require("mongoose").Types.ObjectId;
+    const id = new ObjectId(`${bookingId}`);
     const booking = await Booking.findByIdAndUpdate(bookingId, {
       status: "cancelled",
     });
@@ -720,7 +895,9 @@ exports.terminateBooking = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Booking not found" });
+
     const instance = new Razorpay({ key_id: key, key_secret: secret });
+
     let refundSuccessful = false;
 
     const paymentData = await Payment.findOneAndUpdate(
@@ -728,21 +905,22 @@ exports.terminateBooking = async (req, res) => {
       { status: "refund initiated" },
       { new: true }
     );
-    console.log("batm1");
-    const payment = await Payment.findOne({ bookingId: bookingId });
+    console.log("batm1", paymentData);
+    const payment = await Payment.findOne({ bookingId: id });
     if (!payment) {
       return res.status(404).json({
         success: false,
         message: "Payment refund initiation failed",
       });
     }
-    console.log("batm2");
+    console.log("batm2", payment);
     const refund = await instance.payments.refund(payment.paymentId, {
-      amount: payment.amount,
+      amount: payment?.amount,
       speed: "normal",
       notes: { notes_key_1: "Full Refund" },
       receipt: `Refund No. ${bookingId}`,
     });
+
     console.log("batm3");
     if (!refund) {
       return res
@@ -755,7 +933,8 @@ exports.terminateBooking = async (req, res) => {
     // Update statuses only if refund is successful
     await Payment.findOneAndUpdate(
       { bookingId: bookingId },
-      { status: "refunded" }
+      { status: "refunded" },
+      { paymentType: "refunded" }
     );
     await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
     const adminEmail = "majesticescape.in@gmail.com";
@@ -765,8 +944,17 @@ exports.terminateBooking = async (req, res) => {
     // await sendEmail(adminEmail, 15, params);
 
     res.status(200).json({ success: true, data: booking });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+  } catch (err) {
+    if (err.response) {
+      console.error("Razorpay Error Status:", err.response.status);
+      console.error("Razorpay Error Body:", err.response.data); // 👈 full details
+    } else {
+      console.error("Refund Error:", err);
+    }
+    return res.status(400).json({
+      success: false,
+      error: err.response?.data || err.message,
+    });
   }
 };
 
@@ -934,7 +1122,10 @@ exports.terminateUserBooking = async (req, res) => {
       refundSuccessful = true;
 
       // Update statuses only if refund is successful
-      await Payment.findOneAndUpdate({ bookingId: id }, { status: "refunded" });
+      await Payment.findOneAndUpdate(
+        { bookingId: id },
+        { status: "refunded", paymentType: "refunded" }
+      );
       await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
     }
 
@@ -1019,7 +1210,10 @@ exports.terminateNonUserBooking = async (req, res) => {
       refundSuccessful = true;
 
       // Update statuses only if refund is successful
-      await Payment.findOneAndUpdate({ bookingId: id }, { status: "refunded" });
+      await Payment.findOneAndUpdate(
+        { bookingId: id },
+        { status: "refunded", paymentType: "refunded" }
+      );
       await Booking.findByIdAndUpdate(bookingId, { paymentStatus: "refunded" });
     }
 
