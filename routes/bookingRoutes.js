@@ -24,7 +24,15 @@ router.get(
   authMiddleware,
   bookingController.getAllFilterBookings
 );
+router.patch(
+  "/modal-close",
+  authMiddleware,
+  bookingController.updateCloseModal
+);
 
+router.post("/admin-modify", authMiddleware, bookingController.modifyBooking);
+
+router.patch("/update-flag", authMiddleware, bookingController.updateFlag);
 // router.get(
 //   "/basic-filter",
 //   authMiddleware,
