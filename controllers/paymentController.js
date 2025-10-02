@@ -4,14 +4,93 @@ const crypto = require("crypto");
 const Payment = require("../models/Payment");
 const User = require("../models/User");
 const Booking = require("../models/Booking");
+const { parseMDYToUTC } = require("../utils/convertDate");
 const razorpay = new Razorpay({
   key_id: "rzp_test_w0bKE5w5UPOPrY",
   key_secret: "iYRZ22GvJhYb5ryCmhAc6wig",
 });
+// helper: parse "MM/DD/YYYY" or "M/D/YYYY"
+
+// Usage in your route:
+
+exports.fetch = async (req, res) => {
+  try {
+    const { paymentType, search, searchList, from, to } = req.query;
+    const date = parseMDYToUTC(from, to);
+
+    console.log(date.from, date.to);
+
+    const filter = {};
+    if (paymentType && paymentType != "all") {
+      filter.paymentType = paymentType;
+    }
+
+    if (from && !to) {
+      // only from date given
+      filter.createdAt = { $gte: date.from };
+    } else if (from && to) {
+      // both from and to date given
+      filter.createdAt = {
+        $gte: date.from,
+        $lte: date.to,
+      };
+    }
+
+    let data;
+    if (!searchList) {
+      data = await Payment.find(filter).populate("propertyId");
+    }
+    if (searchList) {
+      if (searchList == "date-desc") {
+        data = await Payment.find(filter)
+          .populate("propertyId")
+          .sort({ createdAt: -1 });
+      } else if (searchList == "date-asc") {
+        data = await Payment.find(filter)
+          .populate("propertyId")
+          .sort({ createdAt: 1 });
+      } else if (searchList == "amount-desc") {
+        data = await Payment.find(filter)
+          .populate("propertyId")
+          .sort({ amount: -1 });
+      } else {
+        data = await Payment.find(filter)
+          .populate("propertyId")
+          .sort({ amount: 1 });
+      }
+    }
+
+    if (!data) {
+      return res.status(400).json({
+        success: false,
+        error: "Payment data not available",
+      });
+    }
+    if (search) {
+      data = data.filter(
+        (b) =>
+          b.propertyId.title.toLowerCase().includes(search.toLowerCase()) ||
+          b.paymentId.toLowerCase().includes(search.toLowerCase()) ||
+          b.customerDetails.name.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    res.json({
+      success: true,
+      data: data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to create order",
+    });
+  }
+};
 // Create a new order
+
 exports.createOrder = async (req, res) => {
   try {
-    const { bookingId, userId, currency, amount } = req.body;
+    const { bookingId, userId, currency, amount, propertyId } = req.body;
 
     // Validate amount
     if (!amount || amount < 100) {
@@ -40,6 +119,7 @@ exports.createOrder = async (req, res) => {
       amount: order.amount,
       currency: order.currency,
       bookingId: bookingId,
+      propertyId: propertyId,
       customerDetails: {
         name: user.firstName + " " + user.lastName,
         email: user.email,
@@ -64,8 +144,12 @@ exports.createOrder = async (req, res) => {
 // Verify payment
 exports.verifyPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-      req.body;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      paymentMethod,
+    } = req.body;
 
     // Verify signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -75,13 +159,14 @@ exports.verifyPayment = async (req, res) => {
       .digest("hex");
 
     const isAuthentic = expectedSignature === razorpay_signature;
-
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
     if (isAuthentic) {
       // Update payment details in database
       await Payment.findOneAndUpdate(
         { orderId: razorpay_order_id },
         {
           paymentId: razorpay_payment_id,
+          paymentMethod: payment?.method,
           status: "paid",
         }
       );

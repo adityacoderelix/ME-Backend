@@ -31,6 +31,20 @@ const paymentSchema = new mongoose.Schema({
     ref: "Booking",
     required: true,
   },
+  propertyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "ListingProperty",
+    required: true,
+  },
+  paymentType: {
+    type: String,
+    enum: ["pay-in", "pay-out", "refunded"],
+    default: "pay-in",
+  },
+  paymentMethod: {
+    type: String,
+    default: "unknown",
+  },
   customerDetails: {
     name: String,
     email: String,
