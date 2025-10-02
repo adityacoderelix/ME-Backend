@@ -24,11 +24,16 @@ const bookingSchema = new mongoose.Schema({
     enum: ["paid", "unpaid", "refunded"],
     default: "unpaid",
   },
+  flag: {
+    type: Boolean,
+    default: false,
+  },
   cancellationPolicy: {
     type: String,
     enum: ["strict", "moderate", "flexible"],
     default: "moderate",
   },
+
   guests: {
     type: Number,
     default: 1,
