@@ -6,6 +6,7 @@ const secret = process.env.JWT_SECRET;
 const mongoose = require("mongoose");
 const HostReview = require("../models/HostReview");
 const User = require("../models/User");
+const { sendEmail } = require("../utils/sendEmail");
 
 // exports.submitReview = async (req, res) => {
 //   try {
@@ -332,6 +333,105 @@ exports.checkReview = async (req, res) => {
   }
 };
 
+// exports.updateReview = async (req, res) => {
+//   try {
+//     const { propertyId, bookingId, rating, status } = req.query;
+
+//     const property = await ListingProperty.findById(propertyId);
+//     if (!property) {
+//       return res
+//         .status(404)
+//         .json({ success: false, data: false, message: "Review not found" });
+//     }
+
+//     const total = Number(property.averageRating) * Number(property.reviewCount);
+//     const newTotal = total - Number(rating);
+//     const newCount = Number(property.reviewCount) - 1;
+//     const newAvg = newTotal / newCount;
+//     const updateRating = await ListingProperty.findOneAndUpdate(
+//       { bookingId: bookingId },
+//       {
+//         averageRating: newAvg,
+//         reviewCount: newCount,
+//       }
+//     );
+//     const filter = {};
+//     if (status) {
+//       filter.hideStatus = status;
+//     }
+//     const data = await Review.findOneAndUpdate(
+//       { bookingId: bookingId },
+//       { filter }
+//     );
+//     res.status(201).json({ success: true, data: data });
+//   } catch (error) {
+//     res.status(400).json({ success: false, error: error.message });
+//   }
+// };
+exports.updateReview = async (req, res) => {
+  try {
+    const { propertyId, bookingId, rating, status } = req.query;
+
+    // Find the property first
+    const property = await ListingProperty.findById(
+      new mongoose.Types.ObjectId(propertyId)
+    );
+    if (!property) {
+      return res
+        .status(404)
+        .json({ success: false, data: false, message: "Property not found" });
+    }
+
+    // ✅ Recalculate average rating
+    if (status && status == "accept") {
+      const total =
+        Number(property.averageRating) * Number(property.reviewCount);
+      const newTotal = total - Number(rating);
+      if (newTotal >= 0) {
+        const newCount = Math.max(Number(property.reviewCount) - 1, 0); // avoid negative
+        const newAvg = newCount > 0 ? newTotal / newCount : 0;
+
+        // ✅ Update property by its _id
+        await ListingProperty.findByIdAndUpdate(
+          new mongoose.Types.ObjectId(propertyId),
+          {
+            averageRating: newAvg,
+            reviewCount: newCount,
+          }
+        );
+      }
+    }
+
+    // ✅ Update review (status/hideStatus)
+    const updateFields = {};
+    if (status) {
+      updateFields.hideStatus = status;
+    }
+
+    const review = await Review.findOneAndUpdate(
+      { bookingId: new mongoose.Types.ObjectId(bookingId) },
+      updateFields,
+      { new: true } // return updated review
+    );
+
+    if (!review) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Review not found" });
+    }
+    const params = { firstName: "Ad" };
+    if (status == "accept") {
+      await sendEmail(property.hostEmail, 37, params);
+    } else if (status == "reject") {
+      await sendEmail(property.hostEmail, 38, params);
+    }
+
+    res.status(200).json({ success: true, data: review });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
 exports.checkHostReview = async (req, res) => {
   try {
     const { id } = req.params;
@@ -377,7 +477,10 @@ exports.getPropertyReview = async (req, res) => {
     const skipValue = parseInt(req.query.skip) || 0;
     const ObjectId = require("mongoose").Types.ObjectId;
     const id = new ObjectId(`${req.params.propertyId}`);
-    const review = await Review.find({ property: id })
+    const review = await Review.find({
+      property: id,
+      hideStatus: { $nin: ["accept"] },
+    })
       .populate("user")
       .limit(limitValue)
       .skip(skipValue)

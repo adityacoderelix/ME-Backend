@@ -18,6 +18,16 @@ const reviewSchema = new mongoose.Schema(
       required: true,
     },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    hideStatus: {
+      type: String,
+      enum: ["accept", "reject", "pending"],
+      default: "pending",
+    },
+    flag: {
+      type: Boolean,
+
+      default: false,
+    },
     rating: { type: Number, required: true, min: 1, max: 5 },
     content: { type: String, required: true },
   },
