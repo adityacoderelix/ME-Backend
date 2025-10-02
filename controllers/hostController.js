@@ -1,6 +1,7 @@
 const ListingProperty = require("../models/ListingProperty");
 const Review = require("../models/Review");
 const User = require("../models/User");
+const { parseMDYToUTC } = require("../utils/convertDate");
 // Get all hosts and their properties
 exports.getAllHosts = async (req, res) => {
   try {
@@ -28,7 +29,7 @@ exports.getHostById = async (req, res) => {
 
 exports.getHostReviewsById = async (req, res) => {
   try {
-    const { search, stars, checkin, checkout, property } = req.query;
+    const { search, stars, email, checkin, checkout, property } = req.query;
     const ObjectId = require("mongoose").Types.ObjectId;
 
     // Host ID from params
@@ -37,34 +38,36 @@ exports.getHostReviewsById = async (req, res) => {
     // Step 1: Build base filter
     let filter = { hostId: hostId };
 
-    if (stars && stars != "all") {
+    // ⭐ Fix date filter
+    if (checkin && checkout) {
+      const range = parseMDYToUTC(checkin, checkout);
+      filter.createdAt = { $gte: range.from, $lte: range.to };
+    } else if (checkin && !checkout) {
+      const singleDay = parseMDYToUTC(checkin); // pass only checkin
+      filter.createdAt = { $gte: singleDay.from, $lte: singleDay.to };
+    }
+    if (stars && stars !== "all") {
       filter.rating = Number(stars);
     }
-    const rawReviews = await Review.find(filter).lean();
-    console.log(
-      "Raw bookingIds in reviews:",
-      rawReviews.map((r) => r.bookingId)
-    );
+
     // Step 2: Fetch reviews with population
     let reviews = await Review.find(filter)
       .populate({
         path: "bookingId",
         model: "Booking",
-        select: "checkIn checkOut", // we only need dates
+        select: "checkIn checkOut flag",
       })
       .populate({
         path: "property",
-        select: "title", // so we can filter by property name
+        select: "title hostEmail",
       })
       .populate({
         path: "user",
-        select: "firstName lastName", // so we can search guest name
+        select: "firstName lastName",
       })
       .lean();
-    console.log("Populate", reviews);
-    // Step 3: Apply extra filters in JS
 
-    // Search filter: matches review content OR user full name
+    // Step 3: Extra filters in JS
     if (search) {
       const s = search.toLowerCase();
       reviews = reviews.filter(
@@ -74,47 +77,14 @@ exports.getHostReviewsById = async (req, res) => {
       );
     }
 
-    // Property name filter
-    if (property && property != "all") {
+    if (property && property !== "all") {
       const p = property.toLowerCase();
       reviews = reviews.filter((r) =>
         r.property?.title?.toLowerCase().includes(p)
       );
     }
 
-    // Check-in / Check-out filter
-    if (checkin || checkout) {
-      const start = new Date(checkin);
-      start.setDate(start.getDate() + 1);
-      const end = new Date(checkout);
-      end.setDate(end.getDate() + 1);
-      const from = checkin ? start : null;
-      const to = checkout ? end : null;
-
-      reviews = reviews.filter((r) => {
-        const bookingCheckIn = r?.bookingId?.checkIn
-          ? new Date(r?.bookingId?.checkIn)
-          : null;
-        const bookingCheckOut = r?.bookingId?.checkOut
-          ? new Date(r?.bookingId?.checkOut)
-          : null;
-        console.log("rev7", bookingCheckIn, bookingCheckOut);
-        if (!bookingCheckIn || !bookingCheckOut) return false;
-
-        let isValid = true;
-
-        if (from && bookingCheckIn < from) {
-          isValid = false;
-        }
-        if (to && bookingCheckOut > to) {
-          isValid = false;
-        }
-
-        return isValid;
-      });
-    }
-
-    // Step 4: Calculate average & count
+    // Step 4: Average rating
     const avgRating =
       reviews.length > 0
         ? (
@@ -130,6 +100,93 @@ exports.getHostReviewsById = async (req, res) => {
       reviewCount: reviews.length,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching reviews", error });
+    console.error("Error in getHostReviewsById:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching reviews", error: error.message });
+  }
+};
+
+exports.getAllReviews = async (req, res) => {
+  try {
+    const { flagged, search, stars, checkin, checkout, property } = req.query;
+    console.log("reached");
+    const filter = {};
+
+    // ⭐ Fix date filter
+    if (checkin && checkout) {
+      const range = parseMDYToUTC(checkin, checkout);
+      filter.createdAt = { $gte: range.from, $lte: range.to };
+    } else if (checkin && !checkout) {
+      const singleDay = parseMDYToUTC(checkin); // pass only checkin
+      filter.createdAt = { $gte: singleDay.from, $lte: singleDay.to };
+    }
+    if (stars && stars !== "all") {
+      filter.rating = Number(stars);
+    }
+
+    // Step 2: Fetch reviews with population
+    let reviews = await Review.find(filter)
+      .populate({
+        path: "bookingId",
+        model: "Booking",
+
+        select: "checkIn checkOut flag",
+      })
+      .populate({
+        path: "property",
+        select: "title",
+      })
+      .populate({
+        path: "user",
+        select: "firstName lastName",
+      })
+      .lean();
+
+    console.log("a", reviews);
+    // Step 3: Extra filters in JS
+
+    if (flagged && flagged == "true") {
+      reviews = reviews.filter(
+        (r) => r.bookingId.flag == true && r.hideStatus == "pending"
+      );
+    }
+
+    if (search) {
+      const s = search.toLowerCase();
+      reviews = reviews.filter(
+        (r) =>
+          r.content?.toLowerCase().includes(s) ||
+          `${r.user?.firstName} ${r.user?.lastName}`.toLowerCase().includes(s)
+      );
+    }
+
+    if (property && property !== "all") {
+      const p = property.toLowerCase();
+      reviews = reviews.filter((r) =>
+        r.property?.title?.toLowerCase().includes(p)
+      );
+    }
+
+    // Step 4: Average rating
+    const avgRating =
+      reviews.length > 0
+        ? (
+            reviews.reduce((sum, r) => sum + (r.rating || 0), 0) /
+            reviews.length
+          ).toFixed(2)
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      data: reviews,
+      averageRating: avgRating,
+      reviewCount: reviews.length,
+    });
+  } catch (error) {
+    console.error("Error in getHostReviewsById:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching reviews", error: error.message });
   }
 };
