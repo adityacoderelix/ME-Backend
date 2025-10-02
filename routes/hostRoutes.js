@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const hostController = require("../controllers/hostController");
 const propertyController = require("../controllers/propertyController");
+const authMiddleware = require("../middleware/authMiddleware");
 
 // Get all hosts and their properties
 router.get("/", hostController.getAllHosts);
@@ -9,7 +10,10 @@ router.get("/", hostController.getAllHosts);
 // Get a single host and their properties
 router.get("/:hostId", hostController.getHostById);
 
+router.get("/review/admin", authMiddleware, hostController.getAllReviews);
+
 router.get("/review/:userId", hostController.getHostReviewsById);
+
 // // Add a new property for a host
 // router.post("/:hostId/properties", propertyController.addProperty);
 
