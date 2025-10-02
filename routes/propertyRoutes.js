@@ -6,6 +6,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 router.get("/", propertyController.getAllProperties);
 router.get("/static", propertyController.getAllStaticProperties);
 router.get("/dynamic", propertyController.getAllStays);
+router.get("/id-and-name", propertyController.getIdandName);
 router.get(
   "/active/:id",
   authMiddleware,
@@ -22,6 +23,11 @@ router.get("/:id", propertyController.getPropertyById);
 router.post("/", propertyController.createProperty);
 router.put("/:id", propertyController.updateProperty);
 
+router.get(
+  "/admin/active",
+  authMiddleware,
+  propertyController.getAllActiveProperty
+);
 router.get(
   "/admin/processing-listings",
   propertyController.getProcessingListingsForAdmin
