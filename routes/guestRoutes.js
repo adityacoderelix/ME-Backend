@@ -8,20 +8,21 @@ const {
   getGuests,
   getGuestsById,
 } = require("../controllers/guestController");
+const authMiddleware = require("../middleware/authMiddleware");
 
-router.get("/", getGuests);
+router.get("/", authMiddleware, getGuests);
 // Get user information
 router.get("/info/:userId", getUserInfo);
 
 router.get("/guest-by-id", getGuestsById);
 
 // Delete user
-router.delete("/delete/:userId", deleteUser);
+router.delete("/delete/:userId", authMiddleware, deleteUser);
 
 // Ban user
-router.patch("/ban/:userId", banUser);
+router.patch("/ban/:userId", authMiddleware, banUser);
 
 // Unban user
-router.patch("/unban/:userId", unbanUser);
+// router.patch("/unban/:userId", authMiddleware, unbanUser);
 
 module.exports = router;
