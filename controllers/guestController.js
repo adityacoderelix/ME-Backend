@@ -3,8 +3,42 @@ const User = require("../models/User");
 // Get user information by ID
 exports.getGuests = async (req, res) => {
   try {
-    const users = await User.find(); // Fetch all users
-    res.json(users);
+    const { search } = req.query;
+    const total = await User.countDocuments();
+    if (!total) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Document count failed" });
+    }
+    if (!search && search == "") {
+      const limit = parseInt(req.query.limit) || 2;
+      const skip = parseInt(req.query.skip) || 0;
+      const users = await User.find().limit(limit).skip(skip);
+      if (!users) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User data could not be found" });
+      }
+      res.json({ data: users, total: total });
+    } // Fetch all users
+    else {
+      let users = await User.find();
+      if (!users) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Could not find user data" });
+      }
+      users = users.filter(
+        (item) =>
+          item.firstName.toLowerCase().includes(search.toLowerCase()) ||
+          item.lastName.toLowerCase().includes(search.toLowerCase()) ||
+          (item.firstName + " " + item.lastName)
+            .toLowerCase()
+            .includes(search.toLowerCase())
+      );
+
+      res.json({ data: users, total: total });
+    }
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch users" });
   }
@@ -50,7 +84,8 @@ exports.deleteUser = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json({ message: "User deleted successfully", user });
+    const updatedList = await User.find();
+    res.status(200).json({ message: "User deleted successfully", updatedList });
   } catch (err) {
     res
       .status(500)
@@ -61,20 +96,30 @@ exports.deleteUser = async (req, res) => {
 // Deactivate/Ban a user by ID
 exports.banUser = async (req, res) => {
   const { userId } = req.params;
-  const { bannedReason } = req.body;
-
+  // const { bannedReason } = req.body;
+  const { active } = req.body;
   try {
     const user = await User.findById(userId);
 
     if (!user) return res.status(404).json({ message: "User not found" });
-
-    user.status.active = false;
-    user.status.banned = true;
-    user.status.bannedReason = bannedReason || "No reason provided";
+    if (active) {
+      user.status.active = false;
+      user.status.banned = true;
+      // user.status.bannedReason = bannedReason || "No reason provided";
+    } else {
+      user.status.active = true;
+      user.status.banned = false;
+    }
 
     await user.save();
 
-    res.status(200).json({ message: "User banned successfully", user });
+    const data = await User.find();
+    if (!data) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User data could not be found" });
+    }
+    res.status(200).json({ message: "User banned successfully", data });
   } catch (err) {
     res.status(500).json({ error: "Error banning user", details: err.message });
   }
