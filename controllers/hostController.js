@@ -1,7 +1,24 @@
+const BankDetail = require("../models/BankDetail");
 const ListingProperty = require("../models/ListingProperty");
+const Razorpay = require("razorpay");
 const Review = require("../models/Review");
 const User = require("../models/User");
 const { parseMDYToUTC } = require("../utils/convertDate");
+const axios = require("axios");
+const { encrypt } = require("../utils/encrypt");
+const razorpay = new Razorpay({
+  key_id: "rzp_test_RRelkKgMDh3dun",
+  key_secret: "gYeQi2lZFvXMMBRs1lWjGANA",
+});
+
+// const YOUR_KEY = "rzp_test_RRelkKgMDh3dun";
+// const YOUR_SECRET = "gYeQi2lZFvXMMBRs1lWjGANA";
+
+const auth = Buffer.from(`${razorpay.key_id}:${razorpay.key_secret}`).toString(
+  "base64"
+);
+
+const API_URL = process.env.RAZORPAY_API;
 // Get all hosts and their properties
 exports.getAllHosts = async (req, res) => {
   try {
@@ -12,6 +29,136 @@ exports.getAllHosts = async (req, res) => {
   }
 };
 
+exports.submitBankDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate required fields
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing host ID",
+      });
+    }
+
+    const { accountNumber, ifsc, accountHolderName, bankName } = req.body;
+
+    if (!accountNumber || !ifsc || !accountHolderName || !bankName) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    // Check if bank details already exist for this host
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No Data",
+      });
+    }
+    console.log("enter");
+    // Update existing record
+    const createContact = await axios.post(
+      `${API_URL}/contacts`,
+      {
+        name: accountHolderName,
+        email: user.email,
+        contact: user.phoneNumber,
+        type: "vendor",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${auth}`,
+        },
+      }
+    );
+
+    if (createContact.status != 200 && createContact.status !== 201) {
+      return res.json({ success: false, message: createContact.status });
+    }
+    console.log("reach");
+
+    const fundAccount = await axios.post(
+      `${API_URL}/fund_accounts`,
+      {
+        contact_id: `${createContact.data.id}`,
+        account_type: "bank_account",
+        bank_account: {
+          name: accountHolderName,
+          ifsc: ifsc,
+          account_number: accountNumber,
+        },
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${auth}`,
+        },
+      }
+    );
+    console.log("reach2");
+    if (fundAccount.status !== 200 && fundAccount.status !== 201) {
+      return res.json({ success: false, message: fundAccount.status });
+    }
+    console.log("reach3");
+    const accountNumberEncrypt = encrypt(accountNumber);
+    const data = new BankDetail({
+      hostId: id,
+      accountNumber: accountNumberEncrypt,
+      bankName: bankName,
+      ifsc: ifsc,
+      name: accountHolderName,
+      contactId: createContact.data.id,
+      fundId: fundAccount.data.id,
+    });
+    await data.save();
+    const filter = { host: id };
+    const update = { $set: { bankDetails: true } };
+    const property = await ListingProperty.updateMany(filter, update);
+    if (!property) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No property found " });
+    }
+    console.log("reach4");
+    return res.status(200).json({
+      success: true,
+      message: "Bank details added successfully",
+    });
+  } catch (error) {
+    console.error("Error saving bank details:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};
+
+exports.getBankDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing required parameter" });
+    }
+    const data = await BankDetail.findOne({ hostId: id });
+    if (!data) {
+      return res.status(404).json({ success: false, error: "Data not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      messsage: "Bank details successfuly fetched",
+      data: data,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed API", error: error.message });
+  }
+};
 // Get a single host and their properties
 exports.getHostById = async (req, res) => {
   try {
