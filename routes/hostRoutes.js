@@ -7,6 +7,9 @@ const authMiddleware = require("../middleware/authMiddleware");
 // Get all hosts and their properties
 router.get("/", hostController.getAllHosts);
 
+router.post("/bank/:id", authMiddleware, hostController.submitBankDetails);
+
+router.get("/bank/:id", authMiddleware, hostController.getBankDetails);
 // Get a single host and their properties
 router.get("/:hostId", hostController.getHostById);
 
