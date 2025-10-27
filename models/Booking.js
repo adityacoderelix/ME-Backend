@@ -13,6 +13,7 @@ const bookingSchema = new mongoose.Schema({
   checkIn: { type: Date, required: true },
   checkOut: { type: Date, required: true },
   price: { type: Number, required: true },
+  subTotal: { type: Number, required: true },
   currency: { type: String, default: "USD" },
   status: {
     type: String,
