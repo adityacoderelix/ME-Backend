@@ -1,9 +1,10 @@
 const Booking = require("../models/Booking");
-
+const puppeteer = require("puppeteer");
 const Payment = require("../models/Payment");
 const jwt = require("jsonwebtoken");
 const ListingProperty = require("../models/ListingProperty");
 const Users = require("../models/User");
+const fs = require("fs");
 const Agenda = require("agenda");
 const { sendEmail } = require("../utils/sendEmail");
 const User = require("../models/User");
@@ -11,6 +12,7 @@ const Razorpay = require("razorpay");
 const getUnavailableDates = require("../services/getUnavailableDates");
 const { blockedDates } = require("../services/blockedDates");
 const { parseMDYToUTC, parseMDYToUTCBooking } = require("../utils/convertDate");
+const HostPayout = require("../models/HostPayout");
 const TOKEN_EXPIRATION = "14d";
 const mongoConnectionString = process.env.DB_URI;
 const baseUrl = process.env.NEXTAUTH_URL;
@@ -299,6 +301,78 @@ exports.getAllFilterBookings = async (req, res) => {
   }
 };
 
+exports.getRevenueFilter = async (req, res) => {
+  try {
+    const { search, status, from, to, title, hostEmail } = req.query;
+
+    const filter = {};
+    const date = parseMDYToUTC(from, to);
+    console.log("rev", title, date.from, date.to, status);
+    if (status && status.toLowerCase() !== "all") {
+      filter.status = { $regex: new RegExp(status, "i") };
+    }
+
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = date.from;
+      if (to) filter.createdAt.$lte = date.to;
+    }
+    console.log("rev1.5", title);
+    // Fetch bookings first
+    let bookings = await HostPayout.find(filter)
+      .populate([
+        {
+          path: "bookingId",
+          model: "Booking",
+          select: "userId checkIn checkOut",
+          populate: {
+            path: "userId",
+            model: "User",
+            select: "firstName lastName", // whatever fields you want
+          },
+        },
+        {
+          path: "propertyId",
+          model: "ListingProperty",
+          select: "title",
+        },
+      ])
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Apply property title & user search in JS
+    console.log("rev2", bookings);
+    if (title && title.toLowerCase() !== "all") {
+      bookings = bookings.filter((item) =>
+        item.propertyId?.title?.toLowerCase().includes(title.toLowerCase())
+      );
+    }
+
+    if (hostEmail && hostEmail.toLowerCase() !== "all") {
+      bookings = bookings.filter((item) =>
+        item.hostId?.email?.toLowerCase().includes(hostEmail.toLowerCase())
+      );
+    }
+
+    if (search) {
+      const s = search.toLowerCase();
+      bookings = bookings.filter(
+        (b) =>
+          b.propertyId?.title?.toLowerCase().includes(s) ||
+          b.bookingId?.userId?.firstName.toLowerCase().includes(s) ||
+          b.bookingId?.userId?.lastName.toLowerCase().includes(s) ||
+          (b.bookingId?.userId?.firstName + " " + b.bookingId?.userId?.lastName)
+            .toLowerCase()
+            .includes(s)
+      );
+    }
+
+    res.json({ success: true, data: bookings });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.updateCloseModal = async (req, res) => {
   try {
     const { bookingId } = req.body;
@@ -465,6 +539,309 @@ exports.getBookingsByHost = async (req, res) => {
   }
 };
 
+exports.generatePdf = async (req, res) => {
+  try {
+    console.log("🧪 Starting Puppeteer...");
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice - Majestic Escape</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9fafb;
+      display: flex;
+      justify-content: center;
+      padding: 40px 0;
+      margin: 0;
+    }
+
+    .invoice-container {
+      background-color: #fff;
+      width: 100%;
+      max-width: 700px;
+      
+      
+      padding: 32px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      color: #1f2937;
+    }
+
+    p {
+      margin: 4px 0;
+    }
+
+    .header {
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header img {
+      width: 48px;
+      height: 48px;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .text-sm {
+      font-size: 14px;
+      color: #4b5563;
+    }
+
+    .text-gray {
+      color: #6b7280;
+    }
+
+    .font-semibold {
+      font-weight: 600;
+    }
+
+    .font-medium {
+      font-weight: 500;
+    }
+
+    .border-t {
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .border-b {
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .py-4 {
+      padding-top: 16px;
+      padding-bottom: 16px;
+    }
+
+    .price-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .total-row {
+      border-top: 1px solid #e5e7eb;
+      margin-top: 8px;
+      padding-top: 8px;
+      font-weight: 600;
+    }
+
+    .underline a {
+      text-decoration: underline;
+      color: #2563eb;
+      margin-right: 16px;
+      font-size: 14px;
+    }
+
+    .footer {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 16px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .footer a {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Your receipt from Majestic Escape</h1>
+        <p class="text-sm text-gray">
+          Booking ID: <span class="font-medium text-gray">RC54F8Q3EA</span> · April 7, 2025
+        </p>
+      </div>
+      <img src="logo.svg" alt="Logo" />
+    </div>
+
+    <!-- Property Info -->
+    <div class="section">
+      <h2 class="font-semibold">Parcem</h2>
+      <p class="text-sm text-gray">1 night in Parcem</p>
+      <p class="text-sm text-gray">Fri, Apr 25, 2025 – Sat, Apr 26, 2025</p>
+      <p class="text-sm text-gray">Entire home/apt · 1 bed · 1 guest</p>
+      <p class="text-sm text-gray">Hosted by <span class="font-medium">Olesia Shtanko</span></p>
+      <div style="margin-top: 8px;">
+        <p class="text-sm text-gray">
+          Confirmation code: <span class="font-semibold">HM5ZA5R82N</span>
+        </p>
+        <div class="underline" style="margin-top: 8px;">
+          <a href="#">Go to itinerary</a>
+          <a href="#">Go to listing</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Traveler Info -->
+    <div class="section border-t border-b py-4">
+      <p class="text-sm">
+        <span class="font-semibold">Traveler:</span> Deepam Lotlikar
+      </p>
+    </div>
+
+    <!-- Cancellation Policy -->
+    <div class="section">
+      <h3>Cancellation policy</h3>
+      <p class="text-sm text-gray">
+        Free cancellation before 1:00 PM on Apr 20. After that, the reservation is non-refundable.
+        Cutoff times are based on the listing’s local time.
+      </p>
+    </div>
+
+    <!-- Price Breakdown -->
+    <div class="section">
+      <h3>Price breakdown</h3>
+      <div class="text-sm">
+        <div class="price-row"><span>₹2,500.00 × 1 night</span><span>₹2,500.00</span></div>
+        <div class="price-row"><span>Majestic Escape service fee</span><span>₹352.94</span></div>
+        <div class="price-row"><span>Taxes</span><span>₹300.00</span></div>
+        <div class="price-row total-row"><span>Total (INR)</span><span>₹3,152.94</span></div>
+      </div>
+    </div>
+
+    <!-- Payment Info -->
+    <div class="section">
+      <h3>Payment</h3>
+      <div class="text-sm text-gray">
+        <p>UPI</p>
+        <p>April 7, 2025, 2:29:26 PM GMT+5:30</p>
+        <p class="font-medium">₹3,152.94</p>
+        <div class="price-row total-row">
+          <span>Amount paid (INR)</span>
+          <span>₹3,152.94</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Taxes Info -->
+    <div class="section text-sm text-gray">
+      <p>Occupancy taxes include CGST (In - Goa), SGST (In - Goa).</p>
+      <p style="margin-top: 8px;">
+        Majestic Escape Payments India Pvt. Ltd. is a limited payment collection agent of your Host.
+        Upon payment of the total price to Majestic Escape Payments, your payment obligation to your host is satisfied.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>
+        Payment processed by Majestic Escape Payments India Pvt. Ltd.<br />
+        c/o 4th floor, Statesman House, Barakhamba Road, Connaught Place, New Delhi - 110001
+      </p>
+      <p style="margin-top: 8px;">
+        Level 9, Spaze i-Tech Park, A1 Tower, Sector 49, Sohna Road, Gurugram, India - 122018
+      </p>
+      <p style="margin-top: 8px;">
+        <a href="https://www.majesticescape.com">www.majesticescape.com</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+    `);
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+    });
+
+    await browser.close();
+
+    console.log("✅ PDF generated successfully, size:", pdfBuffer.length);
+
+    // 🧠 Critical headers
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=test.pdf",
+      "Content-Length": pdfBuffer.length,
+    });
+
+    // 🧱 Must use .end() to send binary data
+    res.end(pdfBuffer);
+  } catch (err) {
+    console.error("❌ PDF generation failed:", err);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
+// Test endpoint to check if PDF generation works
+exports.testPdf = async (req, res) => {
+  try {
+    console.log("🧪 Testing PDF generation...");
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+
+    // Very simple HTML for testing
+    await page.setContent(`
+      <html>
+        <body>
+          <h1>Test PDF</h1>
+          <p>This is a test PDF generated at ${new Date().toISOString()}</p>
+          <p>If you can see this, PDF generation is working!</p>
+        </body>
+      </html>
+    `);
+
+    const pdfBuffer = await page.pdf({ format: "A4" });
+    await browser.close();
+
+    console.log("✅ Test PDF generated successfully");
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="test.pdf"');
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("❌ Test PDF failed:", error);
+    res.status(500).json({
+      success: false,
+      error: "Test failed",
+      message: error.message,
+    });
+  }
+};
 exports.getBookingsByHostGroupByUsers = async (req, res) => {
   try {
     const { search, from, to, title, hostId } = req.query;
