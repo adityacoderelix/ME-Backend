@@ -402,7 +402,7 @@ exports.saveCalendarUrl = async (req, res) => {
         propertyId,
         kind: "export",
       });
-
+      console.log("new fil", existing);
       if (existing) {
         // ✅ Don't create a new one, just return the existing URL
         const host = process.env.PUBLIC_HOSTNAME;
