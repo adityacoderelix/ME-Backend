@@ -24,6 +24,13 @@ router.get(
   authMiddleware,
   bookingController.getAllFilterBookings
 );
+
+router.get(
+  "/revenue-filter",
+  authMiddleware,
+  bookingController.getRevenueFilter
+);
+
 router.patch(
   "/modal-close",
   authMiddleware,
@@ -47,7 +54,7 @@ router.get(
   bookingController.getActiveBookings
 );
 
-router.get("/hostEmails", bookingController.getAllHostEmails);
+router.get("/hostEmails", authMiddleware, bookingController.getAllHostEmails);
 //Get all bookings (user)
 router.get("/data", authMiddleware, bookingController.getAllUserBookings);
 
@@ -72,6 +79,7 @@ router.get(
   bookingController.getBookingsByHost
 );
 
+router.get("/generate-pdf", bookingController.generatePdf);
 router.get(
   "/users-by-host",
   authMiddleware,
