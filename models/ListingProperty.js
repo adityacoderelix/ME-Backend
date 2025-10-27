@@ -70,6 +70,10 @@ const propertySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  bankDetails: {
+    type: Boolean,
+    default: false,
+  },
   bathroomTypes: {
     private: {
       type: Number,
