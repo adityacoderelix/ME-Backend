@@ -198,8 +198,9 @@ exports.verifyPayment = async (req, res) => {
         return res.status(404).json({ success: false, error: "Not found" });
       }
 
-      res.json({
+      res.status(200).json({
         success: true,
+        data: data,
         message: "Payment verified successfully",
       });
     } else {
