@@ -7,13 +7,17 @@ const AWS = require("aws-sdk");
 require("dotenv").config();
 const app = express();
 
-app.enableCors({
-  origin: process.env.ALLOWED_ORIGIN?.split(","),
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  credentials: true,
-});
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "https://me-admin-swart.vercel.app", // your deployed frontend
+      "http://localhost:3000", // for local development
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
 app.options("*", cors()); // Handle preflight OPTIONS requests explicitly
 
 app.use((req, res, next) => {
