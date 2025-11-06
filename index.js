@@ -8,12 +8,7 @@ require("dotenv").config();
 const app = express();
 
 app.enableCors({
-  origin: [
-    "https://me-admin-swart.vercel.app", // your deployed frontend
-    "http://localhost:3000", // local dev frontend
-    "http://localhost:3001",
-    "https://user-navy-five.vercel.app",
-  ],
+  origin: process.env.ALLOWED_ORIGIN?.split(","),
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true,
 });
