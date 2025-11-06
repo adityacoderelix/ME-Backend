@@ -456,7 +456,7 @@ exports.createPayout = async (req, res) => {
   }
 };
 
-cron.schedule("0 0 * * *", async () => {
+cron.schedule("* * * * *", async () => {
   try {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
