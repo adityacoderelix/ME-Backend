@@ -8,20 +8,29 @@ require("dotenv").config();
 const app = express();
 
 // Middleware
-app.use(
-  cors({
-    origin: [
-      "https://user-navy-five.vercel.app", // your deployed frontend
-      "https://me-admin-swart.vercel.app", // for local development
-    ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    credentials: true,
-  })
-);
-app.options("*", cors()); // Handle preflight OPTIONS requests explicitly
+const allowedOrigins = [
+  "https://user-navy-five.vercel.app",
+  "https://me-admin-swart.vercel.app",
+];
 
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url} received`);
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    );
+  }
+  // For OPTIONS requests, short-circuit and respond immediately:
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204); // No Content
+  }
   next();
 });
 
