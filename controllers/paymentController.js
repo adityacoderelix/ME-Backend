@@ -435,7 +435,7 @@ exports.createPayout = async (req, res) => {
     // }
 
     const newAmount = Number(amount) - (3 / 100) * Number(amount);
-    console.log("o1", config.razorpay);
+
     const data = new HostPayout({
       bookingId,
       propertyId,

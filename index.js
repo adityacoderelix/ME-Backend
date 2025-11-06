@@ -8,6 +8,14 @@ require("dotenv").config();
 const app = express();
 
 // Middleware
+// app.use(cors());
+// app.options("*", cors());
+
+// app.use((req, res, next) => {
+//   console.log(`${req.method} ${req.url} received`);
+//   next();
+// });
+
 const allowedOrigins = [
   "https://user-navy-five.vercel.app",
   "https://me-admin-swart.vercel.app",
