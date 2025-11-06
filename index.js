@@ -12,7 +12,7 @@ app.use(
   cors({
     origin: [
       "https://user-navy-five.vercel.app", // your deployed frontend
-      "http://localhost:3000", // for local development
+      "https://me-admin-swart.vercel.app", // for local development
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
