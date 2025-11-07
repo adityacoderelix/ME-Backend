@@ -378,8 +378,8 @@ async function initiatePayout(booking) {
         mode: "IMPS",
         purpose: "payout",
         queue_if_low_balance: true,
-        reference_id: `payout_${booking._id}_${Date.now()}`,
-        narration: `Payout for booking ${booking._id}`,
+        // reference_id: `payout_${booking._id}_${Date.now()}`,
+        // narration: `Payout for booking ${booking._id}`,
         notes: {
           booking_id: booking._id,
           user_id: booking.userId,
