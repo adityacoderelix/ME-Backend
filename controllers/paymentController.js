@@ -503,49 +503,59 @@ exports.createPayout = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
+  // ✅ Return response IMMEDIATELY
+  res.status(200).json({ received: true, timestamp: new Date().toISOString() });
+  
   try {
     const secret = "secret10142025";
-    console.log("🟢 Webhook received");
+    console.log("🟢 Webhook received at:", new Date().toISOString());
 
     const signature = req.headers["x-razorpay-signature"];
+
+    // ✅ Manual raw body collection
+    let rawBody = '';
     
-    // ✅ DEBUG: Check what we're working with
-    console.log("🔍 req.body type:", typeof req.body);
-    console.log("🔍 req.body is Buffer:", Buffer.isBuffer(req.body));
-    console.log("🔍 req.body length:", req.body.length);
+    req.on('data', chunk => {
+      rawBody += chunk.toString();
+    });
 
-    // ✅ Verify signature using the RAW Buffer
-    const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(req.body); // This works because req.body is Buffer
-    const digest = shasum.digest("hex");
+    req.on('end', async () => {
+      try {
+        console.log("🔍 Raw body length:", rawBody.length);
+        
+        // Verify signature
+        const expectedSignature = crypto
+          .createHmac('sha256', secret)
+          .update(rawBody)
+          .digest('hex');
 
-    console.log("🔍 Expected signature:", digest);
-    console.log("🔍 Received signature:", signature);
+        console.log("🔍 Signature check:", {
+          expected: expectedSignature.substring(0, 20) + '...',
+          received: signature?.substring(0, 20) + '...',
+          match: expectedSignature === signature
+        });
 
-    if (digest !== signature) {
-      console.warn("❌ Invalid webhook signature");
-      console.log("❌ Make sure webhook secret matches Razorpay dashboard");
-      return res.status(400).send("Invalid signature");
-    }
+        if (expectedSignature !== signature) {
+          console.warn("❌ Invalid webhook signature");
+          return;
+        }
 
-    console.log("✅ Webhook verified!");
-    
-    // ✅ NOW parse the body for processing
-    const payload = JSON.parse(req.body.toString());
-    
-    console.log("📦 Webhook Event:", payload.event);
-    console.log("Webhook ID:", payload.id || 'N/A');
+        console.log("✅ Webhook verified!");
+        
+        // Parse payload
+        const payload = JSON.parse(rawBody);
+        console.log("📦 Webhook Event:", payload.event);
 
-    // Handle events asynchronously to avoid timeout
-    processWebhookEvent(payload).catch(console.error);
+        // Process asynchronously
+        processWebhookEvent(payload).catch(console.error);
 
-    // ✅ Always return 200 immediately
-    res.status(200).json({ status: "ok", event: payload.event });
+      } catch (error) {
+        console.error("❌ Webhook processing error:", error);
+      }
+    });
 
   } catch (error) {
-    console.error("❌ Webhook Error:", error);
-    // ✅ Still return 200 to prevent Razorpay retries
-    res.status(200).json({ success: false, error: error.message });
+    console.error("❌ Webhook setup error:", error);
   }
 };
 
