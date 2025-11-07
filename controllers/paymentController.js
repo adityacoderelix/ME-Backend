@@ -347,10 +347,11 @@ exports.getPaymentByBooking = async (req, res) => {
 //     });
 //   }
 // };
-const string = generateUniqueString();
+
 async function initiatePayout(booking) {
   try {
     console.log("Entered payout", booking);
+    const generatestring = generateUniqueString();
     if (!booking.price || booking.price < 100) {
       return { success: false, error: "Amount too small" };
     }
@@ -390,7 +391,7 @@ async function initiatePayout(booking) {
       {
         headers: {
           "Content-Type": "application/json",
-          "X-Payout-Idempotency": string,
+          "X-Payout-Idempotency": generatestring,
           Authorization: `Basic ${auth}`,
         },
       }
