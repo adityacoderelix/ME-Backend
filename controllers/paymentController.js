@@ -366,7 +366,7 @@ async function initiatePayout(booking) {
         error: "Host payout document details not found",
       };
     }
-    console.log("amount", host.payout);
+ 
     console.log("Entered payout3");
     const payout = await axios.post(
       `${API_URL}/payouts`,
