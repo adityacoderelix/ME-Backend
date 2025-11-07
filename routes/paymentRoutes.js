@@ -26,6 +26,6 @@ router.post(
 
 router.post("/create-payout", paymentController.createPayout);
 
-// router.post("/payout", paymentController.payout);
+router.post("/payout", paymentController.payout);
 
 module.exports = router;
