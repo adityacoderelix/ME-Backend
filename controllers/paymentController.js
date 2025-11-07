@@ -508,31 +508,111 @@ exports.createPayout = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const secret = "secret10142025";
-    console.log("enter webhook");
+    console.log("🟢 Webhook received");
 
     const signature = req.headers["x-razorpay-signature"];
-
+    
+    // Verify signature
     const shasum = crypto.createHmac("sha256", secret);
     shasum.update(req.body);
     const digest = shasum.digest("hex");
 
-    if (digest === signature) {
-      console.log("✅ Webhook verified!");
-      const payload = JSON.parse(req.body.toString());
-      console.log("Webhook Data:", payload);
-
-      if (payload.event === "payout.processed") {
-        const payoutData = payload.payload.payout.entity;
-        console.log("Payout completed for:", payoutData.id);
-      }
-
-      res.status(200).json({ status: "ok" });
-    } else {
-      console.warn("⚠️ Invalid signature — ignoring webhook");
-      res.status(400).send("Invalid signature");
+    if (digest !== signature) {
+      console.warn("❌ Invalid webhook signature");
+      return res.status(400).send("Invalid signature");
     }
+
+    console.log("✅ Webhook verified!");
+    const payload = JSON.parse(req.body.toString());
+    
+    console.log("📦 Webhook Event:", payload.event);
+    console.log("Webhook Payload:", JSON.stringify(payload, null, 2));
+
+    // Handle different webhook events
+    switch (payload.event) {
+      // ========== PAYOUT EVENTS ==========
+      case "payout.processed":
+        await handlePayoutProcessed(payload.payload.payout.entity);
+        break;
+        
+      case "payout.failed":
+        await handlePayoutFailed(payload.payload.payout.entity);
+        break;
+        
+      case "payout.reversed":
+        await handlePayoutReversed(payload.payload.payout.entity);
+        break;
+
+      // ========== PAYMENT EVENTS ==========
+      case "payment.captured":
+        await handlePaymentCaptured(payload.payload.payment.entity);
+        break;
+        
+      case "payment.failed":
+        await handlePaymentFailed(payload.payload.payment.entity);
+        break;
+        
+      case "payment.authorized":
+        await handlePaymentAuthorized(payload.payload.payment.entity);
+        break;
+
+      default:
+        console.log("⚪ Unhandled webhook event:", payload.event);
+    }
+
+    res.status(200).json({ status: "ok", event: payload.event });
+
   } catch (error) {
     console.error("❌ Webhook Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ========== PAYMENT HANDLERS ==========
+async function handlePaymentCaptured(payment) {
+  try {
+    console.log("💰 Payment Captured:", payment.id);
+    console.log("Amount:", payment.amount / 100); // Convert paise to rupees
+    console.log("Order ID:", payment.order_id);
+    console.log("Customer:", payment.email);
+    
+    // Update your booking status in database
+    // await Booking.findOneAndUpdate(
+    //   { razorpayOrderId: payment.order_id },
+    //   { 
+    //     paymentStatus: 'captured',
+    //     razorpayPaymentId: payment.id,
+    //     paidAt: new Date()
+    //   }
+    // );
+    
+    console.log("✅ Booking payment status updated");
+  } catch (error) {
+    console.error("❌ Error handling payment.captured:", error);
+  }
+}
+
+async function handlePaymentFailed(payment) {
+  console.log("❌ Payment Failed:", payment.id, payment.error_description);
+  // Update booking status to failed
+}
+
+async function handlePaymentAuthorized(payment) {
+  console.log("🔐 Payment Authorized:", payment.id);
+  // Payment is authorized but not captured yet
+}
+
+// ========== PAYOUT HANDLERS ==========
+async function handlePayoutProcessed(payout) {
+  console.log("✅ Payout Processed:", payout.id);
+  // Your existing payout logic
+}
+
+async function handlePayoutFailed(payout) {
+  console.log("❌ Payout Failed:", payout.id);
+  // Your existing payout failure logic
+}
+
+async function handlePayoutReversed(payout) {
+  console.log("🔄 Payout Reversed:", payout.id);
+}
