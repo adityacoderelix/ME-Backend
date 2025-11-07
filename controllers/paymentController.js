@@ -507,14 +507,17 @@ exports.createPayout = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const secret = "secret10142025";
+        const secret = "secret10142025";
     console.log("🟢 Webhook received");
 
     const signature = req.headers["x-razorpay-signature"];
     
+    // Convert request body to string for signature verification
+    const rawBody = JSON.stringify(req.body);
+    
     // Verify signature
     const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(req.body);
+    shasum.update(rawBody);
     const digest = shasum.digest("hex");
 
     if (digest !== signature) {
@@ -523,11 +526,10 @@ exports.update = async (req, res) => {
     }
 
     console.log("✅ Webhook verified!");
-    const payload = JSON.parse(req.body.toString());
+    const payload = req.body; // Now req.body is already parsed JSON
     
     console.log("📦 Webhook Event:", payload.event);
     console.log("Webhook Payload:", JSON.stringify(payload, null, 2));
-
     // Handle different webhook events
     switch (payload.event) {
       // ========== PAYOUT EVENTS ==========
