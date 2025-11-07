@@ -351,7 +351,7 @@ const string = generateUniqueString();
 async function initiatePayout(booking) {
   try {
     console.log("Entered payout", booking);
-    if (!amount || amount < 100) {
+    if (!booking.price || booking.price < 100) {
       return res
         .status(400)
         .json({ success: false, error: "Amount too small" });
