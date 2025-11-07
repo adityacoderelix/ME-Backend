@@ -442,6 +442,13 @@ exports.createPayout = async (req, res) => {
     });
     await data.save();
 
+    const job = await setcronjob();
+    if (job.success) {
+      console.log(`✅ Cron start successful for booking`);
+    } else {
+      console.log(`❌ cron start failed for booking`);
+    }
+    
     res.status(200).json({
       success: true,
       data: data,
@@ -454,7 +461,7 @@ exports.createPayout = async (req, res) => {
   }
 };
 
-cron.schedule("* * * * *", async () => {
+async function setcronjob(){
   try {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
