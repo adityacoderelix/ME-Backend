@@ -415,6 +415,50 @@ async function initiatePayout(booking) {
   }
 }
 
+
+
+async function setcronjob(){
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const confirmedBookings = await Booking.find({
+      status: "confirmed",
+      checkIn: { $gte: todayStart, $lte: todayEnd },
+    });
+
+    console.log(
+      `📅 Found ${confirmedBookings.length} bookings for payout today`
+    );
+
+    const results = [];
+    for (const booking of confirmedBookings) {
+      const result = await initiatePayout(booking);
+      results.push(result);
+
+      // Log each result
+      if (result.success) {
+        console.log(`✅ Payout successful for booking: ${booking._id}`);
+      } else {
+        console.log(
+          `❌ Payout failed for booking: ${booking._id} - ${result.error}`
+        );
+      }
+    }
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    console.log(
+      `📊 Cron job completed: ${successful} successful, ${failed} failed`
+    );
+  } catch (err) {
+    console.error("❌ Cron job error:", err.message);
+  }
+});
+
+
 exports.createPayout = async (req, res) => {
   try {
     const { bookingId, propertyId, amount } = req.body;
@@ -460,47 +504,6 @@ exports.createPayout = async (req, res) => {
     });
   }
 };
-
-async function setcronjob(){
-  try {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const confirmedBookings = await Booking.find({
-      status: "confirmed",
-      checkIn: { $gte: todayStart, $lte: todayEnd },
-    });
-
-    console.log(
-      `📅 Found ${confirmedBookings.length} bookings for payout today`
-    );
-
-    const results = [];
-    for (const booking of confirmedBookings) {
-      const result = await initiatePayout(booking);
-      results.push(result);
-
-      // Log each result
-      if (result.success) {
-        console.log(`✅ Payout successful for booking: ${booking._id}`);
-      } else {
-        console.log(
-          `❌ Payout failed for booking: ${booking._id} - ${result.error}`
-        );
-      }
-    }
-    const successful = results.filter((r) => r.success).length;
-    const failed = results.filter((r) => !r.success).length;
-
-    console.log(
-      `📊 Cron job completed: ${successful} successful, ${failed} failed`
-    );
-  } catch (err) {
-    console.error("❌ Cron job error:", err.message);
-  }
-});
 
 exports.update = async (req, res) => {
   try {
