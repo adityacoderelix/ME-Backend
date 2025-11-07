@@ -508,69 +508,86 @@ exports.createPayout = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-        const secret = "secret10142025";
+    const secret = "secret10142025";
     console.log("🟢 Webhook received");
 
     const signature = req.headers["x-razorpay-signature"];
     
-    // Convert request body to string for signature verification
-    const rawBody = JSON.stringify(req.body);
-    
-    // Verify signature
+    // ✅ DEBUG: Check what we're working with
+    console.log("🔍 req.body type:", typeof req.body);
+    console.log("🔍 req.body is Buffer:", Buffer.isBuffer(req.body));
+    console.log("🔍 req.body length:", req.body.length);
+
+    // ✅ Verify signature using the RAW Buffer
     const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(rawBody);
+    shasum.update(req.body); // This works because req.body is Buffer
     const digest = shasum.digest("hex");
+
+    console.log("🔍 Expected signature:", digest);
+    console.log("🔍 Received signature:", signature);
 
     if (digest !== signature) {
       console.warn("❌ Invalid webhook signature");
+      console.log("❌ Make sure webhook secret matches Razorpay dashboard");
       return res.status(400).send("Invalid signature");
     }
 
     console.log("✅ Webhook verified!");
-    const payload = req.body; // Now req.body is already parsed JSON
+    
+    // ✅ NOW parse the body for processing
+    const payload = JSON.parse(req.body.toString());
     
     console.log("📦 Webhook Event:", payload.event);
-    console.log("Webhook Payload:", JSON.stringify(payload, null, 2));
-    // Handle different webhook events
-    switch (payload.event) {
-      // ========== PAYOUT EVENTS ==========
-      case "payout.processed":
-        await handlePayoutProcessed(payload.payload.payout.entity);
-        break;
-        
-      case "payout.failed":
-        await handlePayoutFailed(payload.payload.payout.entity);
-        break;
-        
-      case "payout.reversed":
-        await handlePayoutReversed(payload.payload.payout.entity);
-        break;
+    console.log("Webhook ID:", payload.id || 'N/A');
 
-      // ========== PAYMENT EVENTS ==========
-      case "payment.captured":
-        await handlePaymentCaptured(payload.payload.payment.entity);
-        break;
-        
-      case "payment.failed":
-        await handlePaymentFailed(payload.payload.payment.entity);
-        break;
-        
-      case "payment.authorized":
-        await handlePaymentAuthorized(payload.payload.payment.entity);
-        break;
+    // Handle events asynchronously to avoid timeout
+    processWebhookEvent(payload).catch(console.error);
 
-      default:
-        console.log("⚪ Unhandled webhook event:", payload.event);
-    }
-
+    // ✅ Always return 200 immediately
     res.status(200).json({ status: "ok", event: payload.event });
 
   } catch (error) {
     console.error("❌ Webhook Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    // ✅ Still return 200 to prevent Razorpay retries
+    res.status(200).json({ success: false, error: error.message });
   }
 };
 
+// Process webhook asynchronously
+async function processWebhookEvent(payload) {
+  try {
+    console.log("🔄 Processing webhook event:", payload.event);
+    
+    switch (payload.event) {
+      case "payout.processed":
+        await handlePayoutProcessed(payload.payload.payout.entity);
+        break;
+      case "payout.failed":
+        await handlePayoutFailed(payload.payload.payout.entity);
+        break;
+      case "payout.reversed":
+        await handlePayoutReversed(payload.payload.payout.entity);
+        break;
+      case "payment.captured":
+        await handlePaymentCaptured(payload.payload.payment.entity);
+        break;
+      case "payment.failed":
+        await handlePaymentFailed(payload.payload.payment.entity);
+        break;
+      case "payment.authorized":
+        await handlePaymentAuthorized(payload.payload.payment.entity);
+        break;
+      default:
+        console.log("⚪ Unhandled webhook event:", payload.event);
+    }
+    
+    console.log("✅ Event processing completed:", payload.event);
+  } catch (error) {
+    console.error(`❌ Error processing ${payload.event}:`, error);
+  }
+}
+
+// Your handler functions remain the same...
 // ========== PAYMENT HANDLERS ==========
 async function handlePaymentCaptured(payment) {
   try {
