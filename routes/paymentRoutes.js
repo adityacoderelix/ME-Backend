@@ -20,7 +20,7 @@ router.get("/booking", paymentController.getPaymentByBooking);
 
 router.post(
   "/payout/update",
-  express.raw({ type: "application/json" }),
+  // express.raw({ type: "application/json" }),
   paymentController.update
 );
 
