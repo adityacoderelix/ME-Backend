@@ -352,32 +352,28 @@ async function initiatePayout(booking) {
   try {
     console.log("Entered payout", booking);
     if (!booking.price || booking.price < 100) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Amount too small" });
+      return { success: false, error: "Amount too small" };
     }
     console.log("Entered payout2");
     const bank = await BankDetail.findOne({ hostId: booking.hostId });
     if (!bank) {
-      return res.status(404).json({
-        success: false,
-        error: "Bank details not found",
-      });
+      return { success: false, error: "Bank details not found" };
     }
     const host = await HostPayout.findOne({ bookingId: booking._id });
     if (!host) {
-      return res.status(404).json({
+      return {
         success: false,
         error: "Host payout document details not found",
-      });
+      };
     }
+    console.log("amount", host.payout);
     console.log("Entered payout3");
     const payout = await axios.post(
       `${API_URL}/payouts`,
       {
         account_number: "2323230087607472",
         fund_account_id: bank.fundId,
-        amount: parseInt(host.amount), // paise
+        amount: 5000, // paise
         currency: "INR",
         mode: "IMPS",
         purpose: "payout",
@@ -401,19 +397,21 @@ async function initiatePayout(booking) {
     );
     console.log("Entered payout4");
     if (!payout) {
-      return res.status(404).json({
-        success: false,
-        error: "Payout failed",
-      });
+      return { success: false, error: "Payout failed" };
     }
 
-    return res.status(200).json({ success: true, data: payout.data });
+    return {
+      success: true,
+      data: payout.data,
+      bookingId: booking._id,
+    };
   } catch (error) {
     console.error("❌ Payout Error:", error);
-    res.status(500).json({
+    return {
       success: false,
       error: error.message || "Failed to create payout",
-    });
+      bookingId: booking._id,
+    };
   }
 }
 
