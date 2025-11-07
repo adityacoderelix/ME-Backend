@@ -488,11 +488,7 @@ exports.createPayout = async (req, res) => {
     await data.save();
 
     const job = await setcronjob();
-    if (job.success) {
-      console.log(`✅ Cron start successful for booking`);
-    } else {
-      console.log(`❌ cron start failed for booking`);
-    }
+  
     
     res.status(200).json({
       success: true,
