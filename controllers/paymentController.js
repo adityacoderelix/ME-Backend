@@ -470,9 +470,26 @@ cron.schedule("* * * * *", async () => {
       `📅 Found ${confirmedBookings.length} bookings for payout today`
     );
 
+    const results = [];
     for (const booking of confirmedBookings) {
-      await initiatePayout(booking);
+      const result = await initiatePayout(booking);
+      results.push(result);
+
+      // Log each result
+      if (result.success) {
+        console.log(`✅ Payout successful for booking: ${booking._id}`);
+      } else {
+        console.log(
+          `❌ Payout failed for booking: ${booking._id} - ${result.error}`
+        );
+      }
     }
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    console.log(
+      `📊 Cron job completed: ${successful} successful, ${failed} failed`
+    );
   } catch (err) {
     console.error("❌ Cron job error:", err.message);
   }
