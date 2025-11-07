@@ -456,7 +456,7 @@ async function setcronjob(){
   } catch (err) {
     console.error("❌ Cron job error:", err.message);
   }
-});
+};
 
 
 exports.createPayout = async (req, res) => {
