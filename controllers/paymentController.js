@@ -396,7 +396,7 @@ async function initiatePayout(booking) {
         },
       }
     );
-    console.log("Entered payout4");
+    console.log("Entered payout4",payout);
     if (!payout) {
       return { success: false, error: "Payout failed" };
     }
