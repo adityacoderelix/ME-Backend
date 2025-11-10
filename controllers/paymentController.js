@@ -396,11 +396,14 @@ async function initiatePayout(booking) {
         },
       }
     );
-    console.log("Entered payout4",payout);
+    console.log("Entered payout4",payout.data);
     if (!payout) {
       return { success: false, error: "Payout failed" };
     }
-
+     const updatePayoutId = await HostPayout.findOneAndUpdate({ bookingId: booking._id },{paymentId:payout.data.id});
+  if (!updatePayoutId) {
+      return { success: false, error: "Failed to save payout id" };
+    }
     return {
       success: true,
       data: payout.data,
