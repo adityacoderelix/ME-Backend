@@ -568,26 +568,26 @@ exports.update = async (req, res) => {
 // Process webhook asynchronously
 async function processWebhookEvent(payload) {
   try {
-    console.log("🔄 Processing webhook event:", payload.event);
+    console.log("🔄 Processing webhook event:", payload);
     
     switch (payload.event) {
       case "payout.processed":
-        await handlePayoutProcessed(payload.payload.payout.entity);
+        await handlePayoutProcessed(payload);
         break;
-      case "payout.failed":
-        await handlePayoutFailed(payload.payload.payout.entity);
+      case "payout.initiated":
+        await handlePayoutFailed(payload);
         break;
       case "payout.reversed":
-        await handlePayoutReversed(payload.payload.payout.entity);
+        await handlePayoutReversed(payload);
         break;
-      case "payment.captured":
-        await handlePaymentCaptured(payload.payload.payment.entity);
+      case "payout.updated":
+        await handlePaymentCaptured(payload);
         break;
-      case "payment.failed":
-        await handlePaymentFailed(payload.payload.payment.entity);
+      case "payout.pending":
+        await handlePaymentFailed(payload);
         break;
-      case "payment.authorized":
-        await handlePaymentAuthorized(payload.payload.payment.entity);
+      case "payout.rejected":
+        await handlePaymentAuthorized(payload);
         break;
       default:
         console.log("⚪ Unhandled webhook event:", payload.event);
@@ -604,9 +604,9 @@ async function processWebhookEvent(payload) {
 async function handlePaymentCaptured(payment) {
   try {
     console.log("💰 Payment Captured:", payment);
-    console.log("Amount:", payment.amount / 100); // Convert paise to rupees
-    console.log("Order ID:", payment.order_id);
-    console.log("Customer:", payment.email);
+    // console.log("Amount:", payment.amount / 100); // Convert paise to rupees
+    // console.log("Order ID:", payment.order_id);
+    // console.log("Customer:", payment.email);
     
     // Update your booking status in database
     // await HostPayout.findOneAndUpdate(
@@ -625,12 +625,13 @@ async function handlePaymentCaptured(payment) {
 }
 
 async function handlePaymentFailed(payment) {
-  console.log("❌ Payment Failed:", payment.id, payment.error_description);
+    console.log("💰 Payment Captured:", payment);
+  // console.log("❌ Payment Failed:", payment.id, payment.error_description);
   // Update booking status to failed
 }
 
 async function handlePaymentAuthorized(payment) {
-  console.log("🔐 Payment Authorized:", payment.id);
+  console.log("🔐 Payment Authorized:", payment);
   // Payment is authorized but not captured yet
 }
 
@@ -641,10 +642,10 @@ async function handlePayoutProcessed(payout) {
 }
 
 async function handlePayoutFailed(payout) {
-  console.log("❌ Payout Failed:", payout.id);
+  console.log("❌ Payout Failed:", payout);
   // Your existing payout failure logic
 }
 
 async function handlePayoutReversed(payout) {
-  console.log("🔄 Payout Reversed:", payout.id);
+  console.log("🔄 Payout Reversed:", payout);
 }
