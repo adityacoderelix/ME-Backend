@@ -546,6 +546,8 @@ exports.update = async (req, res) => {
         // Parse payload
         const payload = JSON.parse(rawBody);
         console.log("📦 Webhook Event:", payload.event);
+        console.log("Payload",payload);
+        console.log("entity",payload.payload.payout.entity);
 
         // Process asynchronously
         processWebhookEvent(payload).catch(console.error);
