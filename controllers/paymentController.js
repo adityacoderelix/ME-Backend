@@ -546,8 +546,8 @@ exports.update = async (req, res) => {
         // Parse payload
         const payload = JSON.parse(rawBody);
         console.log("📦 Webhook Event:", payload.event);
-        console.log("Payload",payload);
-        console.log("entity",payload.payload.payout.entity);
+       
+   
 
         // Process asynchronously
         processWebhookEvent(payload).catch(console.error);
@@ -600,20 +600,20 @@ async function processWebhookEvent(payload) {
 // ========== PAYMENT HANDLERS ==========
 async function handlePaymentCaptured(payment) {
   try {
-    console.log("💰 Payment Captured:", payment.id);
+    console.log("💰 Payment Captured:", payment);
     console.log("Amount:", payment.amount / 100); // Convert paise to rupees
     console.log("Order ID:", payment.order_id);
     console.log("Customer:", payment.email);
     
     // Update your booking status in database
-    await HostPayout.findOneAndUpdate(
-      { razorpayOrderId: payment.order_id },
-      { 
-        paymentStatus: 'captured',
-        razorpayPaymentId: payment.id,
-        paidAt: new Date()
-      }
-    );
+    // await HostPayout.findOneAndUpdate(
+    //   { razorpayOrderId: payment.order_id },
+    //   { 
+    //     paymentStatus: 'captured',
+    //     razorpayPaymentId: payment.id,
+    //     paidAt: new Date()
+    //   }
+    // );
     
     console.log("✅ Booking payment status updated");
   } catch (error) {
