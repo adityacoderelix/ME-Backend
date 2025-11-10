@@ -2,6 +2,29 @@ const mongoose = require("mongoose");
 
 const HostPayoutSchema = new mongoose.Schema(
   {
+    orderId: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  paymentId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+    paymentType: {
+    type: String,
+    enum: ["pay-in", "pay-out", "refunded"],
+    default: "pay-in",
+  },
+     paymentMethod: {
+    type: String,
+    default: "unknown",
+  },
+      currency: {
+    type: String,
+    default: "INR",
+  },
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Booking",
@@ -14,7 +37,7 @@ const HostPayoutSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "paid", "failed"],
+      enum: ["pending", "paid", "failed","reversed","authorized"],
       default: "pending",
     },
     amount: {
