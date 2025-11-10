@@ -15,7 +15,7 @@ const HostPayoutSchema = new mongoose.Schema(
     paymentType: {
     type: String,
     enum: ["pay-in", "pay-out", "refunded"],
-    default: "pay-in",
+    default: "pay-out",
   },
      paymentMethod: {
     type: String,
