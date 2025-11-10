@@ -37,7 +37,7 @@ const HostPayoutSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "paid", "failed","reversed","authorized"],
+      enum: ["pending", "paid", "failed","reversed","authorized","captured"],
       default: "pending",
     },
     amount: {
