@@ -508,8 +508,8 @@ exports.createPayout = async (req, res) => {
 
 exports.update = async (req, res) => {
   // ✅ Return response IMMEDIATELY
-  res.status(200).json({ received: true, timestamp: new Date().toISOString() });
-  
+  // res.status(200).json({ received: true, timestamp: new Date().toISOString() });
+  console.log('Payment payout started');
   try {
     const secret = "secret10142025";
     console.log("🟢 Webhook received at:", new Date().toISOString());
@@ -571,6 +571,9 @@ async function processWebhookEvent(payload) {
     console.log("🔄 Processing webhook event:", payload);
     
     switch (payload.event) {
+      case "payment.captured":
+        console.log("payment captured");
+        break;
       case "payout.processed":
         await handlePayoutProcessed(payload.payload.payout.entity);
         break;
