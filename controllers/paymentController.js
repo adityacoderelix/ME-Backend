@@ -419,6 +419,7 @@ async function initiatePayout(booking) {
 
 
 async function setcronjob(){
+  console.log("entered cron");
   try {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -603,14 +604,14 @@ async function handlePaymentCaptured(payment) {
     console.log("Customer:", payment.email);
     
     // Update your booking status in database
-    // await Booking.findOneAndUpdate(
-    //   { razorpayOrderId: payment.order_id },
-    //   { 
-    //     paymentStatus: 'captured',
-    //     razorpayPaymentId: payment.id,
-    //     paidAt: new Date()
-    //   }
-    // );
+    await HostPayout.findOneAndUpdate(
+      { razorpayOrderId: payment.order_id },
+      { 
+        paymentStatus: 'captured',
+        razorpayPaymentId: payment.id,
+        paidAt: new Date()
+      }
+    );
     
     console.log("✅ Booking payment status updated");
   } catch (error) {
