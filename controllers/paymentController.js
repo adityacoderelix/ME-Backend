@@ -636,7 +636,7 @@ async function handlePaymentAuthorized(payment) {
 
 // ========== PAYOUT HANDLERS ==========
 async function handlePayoutProcessed(payout) {
-  console.log("✅ Payout Processed:", payout.id);
+  console.log("✅ Payout Processed:", payout);
   // Your existing payout logic
 }
 
