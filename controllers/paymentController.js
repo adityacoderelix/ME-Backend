@@ -572,22 +572,22 @@ async function processWebhookEvent(payload) {
     
     switch (payload.event) {
       case "payout.processed":
-        await handlePayoutProcessed(payload);
+        await handlePayoutProcessed(payload.payload.payout.entity);
         break;
       case "payout.initiated":
-        await handlePayoutFailed(payload);
+        await handlePayoutInitiated(payload.payload.payout.entity);
         break;
       case "payout.reversed":
-        await handlePayoutReversed(payload);
+        await handlePayoutReversed(payload.payload.payout.entity);
         break;
       case "payout.updated":
-        await handlePaymentCaptured(payload);
+        await handlePayoutUpdated(payload.payload.payout.entity);
         break;
       case "payout.pending":
-        await handlePaymentFailed(payload);
+        await handlePayoutPending(payload.payload.payout.entity);
         break;
       case "payout.rejected":
-        await handlePaymentAuthorized(payload);
+        await handlePayoutRejected(payload.payload.payout.entity);
         break;
       default:
         console.log("⚪ Unhandled webhook event:", payload.event);
@@ -601,7 +601,7 @@ async function processWebhookEvent(payload) {
 
 // Your handler functions remain the same...
 // ========== PAYMENT HANDLERS ==========
-async function handlePaymentCaptured(payment) {
+async function handlePayoutProcessed(payment) {
   try {
     console.log("💰 Payment Captured:", payment);
     // console.log("Amount:", payment.amount / 100); // Convert paise to rupees
@@ -624,24 +624,24 @@ async function handlePaymentCaptured(payment) {
   }
 }
 
-async function handlePaymentFailed(payment) {
+async function handlePaymentInitiated(payment) {
     console.log("💰 Payment Captured:", payment);
   // console.log("❌ Payment Failed:", payment.id, payment.error_description);
   // Update booking status to failed
 }
 
-async function handlePaymentAuthorized(payment) {
+async function handlePayoutUpdated(payment) {
   console.log("🔐 Payment Authorized:", payment);
   // Payment is authorized but not captured yet
 }
 
-// ========== PAYOUT HANDLERS ==========
-async function handlePayoutProcessed(payout) {
+
+async function handlePayoutPending(payout) {
   console.log("✅ Payout Processed:", payout);
   // Your existing payout logic
 }
 
-async function handlePayoutFailed(payout) {
+async function handlePayoutRejected(payout) {
   console.log("❌ Payout Failed:", payout);
   // Your existing payout failure logic
 }
