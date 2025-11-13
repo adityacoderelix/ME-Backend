@@ -18,6 +18,8 @@ router.get("/payment/:id", paymentController.getPayment);
 
 router.get("/booking", paymentController.getPaymentByBooking);
 
+router.post("/schedule-cron", paymentController.schedulecron);
+
 // router.post(
 //   "/payout/update",
 //   express.raw({ type: "application/json" }),
