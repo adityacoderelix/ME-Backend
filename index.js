@@ -8,39 +8,42 @@ require("dotenv").config();
 const app = express();
 
 // Middleware
-app.use(cors());
-app.options("*", cors());
+// app.use(cors());
+// app.options("*", cors());
+
+// app.use((req, res, next) => {
+//   console.log(`${req.method} ${req.url} received`);
+//   next();
+// });
+
+const allowedOrigins = [
+  "https://user-navy-five.vercel.app",
+  "https://me-admin-swart.vercel.app",
+];
 
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url} received`);
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    );
+  }
+  // For OPTIONS requests, short-circuit and respond immediately:
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204); // No Content
+  }
   next();
 });
 
-// const allowedOrigins = [
-//   "https://user-navy-five.vercel.app",
-//   "https://me-admin-swart.vercel.app",
-// ];
-
-// app.use((req, res, next) => {
-//   const origin = req.headers.origin;
-//   if (origin && allowedOrigins.includes(origin)) {
-//     res.header("Access-Control-Allow-Origin", origin);
-//     res.header("Access-Control-Allow-Credentials", "true");
-//     res.header(
-//       "Access-Control-Allow-Methods",
-//       "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"
-//     );
-//     res.header(
-//       "Access-Control-Allow-Headers",
-//       "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-//     );
-//   }
-//   // For OPTIONS requests, short-circuit and respond immediately:
-//   if (req.method === "OPTIONS") {
-//     return res.sendStatus(204); // No Content
-//   }
-//   next();
-// });
+const webhookRoutes = require("./routes/webhookRoutes");
+app.use("/api/v1/paymentforpayout", webhookRoutes);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));

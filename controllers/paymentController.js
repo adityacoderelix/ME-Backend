@@ -24,6 +24,7 @@ const auth = Buffer.from(
   `${razorpay.key_id.trim()}:${razorpay.key_secret.trim()}`
 ).toString("base64");
 const API_URL = process.env.RAZORPAY_API;
+const ADMIN_ACCOUNT = process.env.ADMIN_ACCOUNT;
 // helper: parse "MM/DD/YYYY" or "M/D/YYYY"
 
 // Usage in your route:
@@ -411,13 +412,14 @@ exports.getPaymentByBooking = async (req, res) => {
 //     console.error("❌ Payout Error:", error);
 //   }
 // };
-const string = generateUniqueString();
+
 async function initiatePayout(booking) {
   try {
     console.log("Entered payout", booking);
     if (!booking.price || booking.price < 100) {
       return { success: false, error: "Amount too small" };
     }
+    const generateString = generateUniqueString();
     console.log("Entered payout2");
     const bank = await BankDetail.findOne({ hostId: booking.hostId });
     if (!bank) {
@@ -430,20 +432,20 @@ async function initiatePayout(booking) {
         error: "Host payout document details not found",
       };
     }
-    console.log("amount", host.payout);
+
     console.log("Entered payout3");
     const payout = await axios.post(
       `${API_URL}/payouts`,
       {
-        account_number: "2323230087607472",
+        account_number: ADMIN_ACCOUNT,
         fund_account_id: bank.fundId,
-        amount: 5000, // paise
+        amount: host.amount * 100, // paise
         currency: "INR",
         mode: "IMPS",
         purpose: "payout",
         queue_if_low_balance: true,
-        reference_id: `payout_${booking._id}_${Date.now()}`,
-        narration: `Payout for booking ${booking._id}`,
+        // reference_id: `payout_${booking._id}_${Date.now()}`,
+        // narration: `Payout for booking ${booking._id}`,
         notes: {
           booking_id: booking._id,
           user_id: booking.userId,
@@ -454,7 +456,7 @@ async function initiatePayout(booking) {
       {
         headers: {
           "Content-Type": "application/json",
-          "X-Payout-Idempotency": string,
+          "X-Payout-Idempotency": generateString,
           Authorization: `Basic ${auth}`,
         },
       }
@@ -463,19 +465,64 @@ async function initiatePayout(booking) {
     if (!payout) {
       return { success: false, error: "Payout failed" };
     }
-
+    const updatePayoutId = await HostPayout.findOneAndUpdate(
+      { bookingId: booking._id },
+      { paymentId: payout.data.id }
+    );
+    if (!updatePayoutId) {
+      return { success: false, error: "Failed to save payout id" };
+    }
     return {
       success: true,
       data: payout.data,
       bookingId: booking._id,
     };
   } catch (error) {
-    console.error("❌ Payout Error:", error);
-    return {
-      success: false,
-      error: error.message || "Failed to create payout",
-      bookingId: booking._id,
-    };
+    console.error("❌ Payout Error Details for booking:", booking._id);
+
+    if (error.response) {
+      // Razorpay API returned an error
+      console.error("Status:", error.response.status);
+      console.error("Headers:", error.response.headers);
+      console.error(
+        "Response Data:",
+        JSON.stringify(error.response.data, null, 2)
+      );
+
+      const razorpayError = error.response.data;
+      const errorMessage =
+        razorpayError.error?.description ||
+        razorpayError.error?.code ||
+        "Razorpay API error";
+
+      console.error("Razorpay Error Message:", errorMessage);
+
+      return {
+        success: false,
+        error: errorMessage,
+        details: razorpayError,
+        bookingId: booking._id,
+      };
+    } else if (error.request) {
+      // Network error
+      console.error("No response received from Razorpay");
+      console.error("Request:", error.request);
+
+      return {
+        success: false,
+        error: "Network error - No response from Razorpay",
+        bookingId: booking._id,
+      };
+    } else {
+      // Setup error
+      console.error("Setup Error:", error.message);
+
+      return {
+        success: false,
+        error: error.message,
+        bookingId: booking._id,
+      };
+    }
   }
 }
 
@@ -518,8 +565,10 @@ exports.createPayout = async (req, res) => {
   }
 };
 
-cron.schedule("* * * * *", async () => {
+// cron.schedule("* * * * *", async () => {
+exports.schedulecron = async (req, res) => {
   try {
+    console.log("enter payout cron");
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
@@ -557,36 +606,147 @@ cron.schedule("* * * * *", async () => {
   } catch (err) {
     console.error("❌ Cron job error:", err.message);
   }
-});
+};
+//);
 
 exports.update = async (req, res) => {
+  // ✅ Return response IMMEDIATELY
+  // res.status(200).json({ received: true, timestamp: new Date().toISOString() });
+  console.log("Payment payout started");
   try {
     const secret = "secret10142025";
-    console.log("enter webhook");
+    console.log("🟢 Webhook received at:", new Date().toISOString());
 
     const signature = req.headers["x-razorpay-signature"];
 
-    const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(req.body);
-    const digest = shasum.digest("hex");
+    // ✅ Manual raw body collection
+    let rawBody = "";
 
-    if (digest === signature) {
-      console.log("✅ Webhook verified!");
-      const payload = JSON.parse(req.body.toString());
-      console.log("Webhook Data:", payload);
+    req.on("data", (chunk) => {
+      rawBody += chunk.toString();
+    });
 
-      if (payload.event === "payout.processed") {
-        const payoutData = payload.payload.payout.entity;
-        console.log("Payout completed for:", payoutData.id);
+    req.on("end", async () => {
+      try {
+        console.log("🔍 Raw body length:", rawBody.length);
+
+        // Verify signature
+        const expectedSignature = crypto
+          .createHmac("sha256", secret)
+          .update(rawBody)
+          .digest("hex");
+
+        console.log("🔍 Signature check:", {
+          expected: expectedSignature.substring(0, 20) + "...",
+          received: signature?.substring(0, 20) + "...",
+          match: expectedSignature === signature,
+        });
+
+        if (expectedSignature !== signature) {
+          console.warn("❌ Invalid webhook signature");
+          return;
+        }
+
+        console.log("✅ Webhook verified!");
+
+        // Parse payload
+        const payload = JSON.parse(rawBody);
+        console.log("📦 Webhook Event:", payload.event);
+
+        // Process asynchronously
+        processWebhookEvent(payload).catch(console.error);
+      } catch (error) {
+        console.error("❌ Webhook processing error:", error);
       }
-
-      res.status(200).json({ status: "ok" });
-    } else {
-      console.warn("⚠️ Invalid signature — ignoring webhook");
-      res.status(400).send("Invalid signature");
-    }
+    });
   } catch (error) {
-    console.error("❌ Webhook Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error("❌ Webhook setup error:", error);
   }
 };
+
+// Process webhook asynchronously
+async function processWebhookEvent(payload) {
+  try {
+    console.log("🔄 Processing webhook event:", payload);
+
+    switch (payload.event) {
+      case "payment.captured":
+        console.log("payment captured");
+        break;
+      case "payout.processed":
+        await handlePayoutProcessed(payload.payload.payout.entity);
+        break;
+      case "payout.initiated":
+        await handlePayoutInitiated(payload.payload.payout.entity);
+        break;
+      case "payout.reversed":
+        await handlePayoutReversed(payload.payload.payout.entity);
+        break;
+      case "payout.updated":
+        await handlePayoutUpdated(payload.payload.payout.entity);
+        break;
+      case "payout.pending":
+        await handlePayoutPending(payload.payload.payout.entity);
+        break;
+      case "payout.rejected":
+        await handlePayoutRejected(payload.payload.payout.entity);
+        break;
+      default:
+        console.log("⚪ Unhandled webhook event:", payload.event);
+    }
+
+    console.log("✅ Event processing completed:", payload.event);
+  } catch (error) {
+    console.error(`❌ Error processing ${payload.event}:`, error);
+  }
+}
+
+// Your handler functions remain the same...
+// ========== PAYMENT HANDLERS ==========
+async function handlePayoutProcessed(payment) {
+  try {
+    console.log("💰 Payment Captured:", payment);
+    // console.log("Amount:", payment.amount / 100); // Convert paise to rupees
+    // console.log("Order ID:", payment.order_id);
+    // console.log("Customer:", payment.email);
+
+    // Update your booking status in database
+    // await HostPayout.findOneAndUpdate(
+    //   { razorpayOrderId: payment.order_id },
+    //   {
+    //     paymentStatus: 'captured',
+    //     razorpayPaymentId: payment.id,
+    //     paidAt: new Date()
+    //   }
+    // );
+
+    console.log("✅ Booking payment status updated");
+  } catch (error) {
+    console.error("❌ Error handling payment.captured:", error);
+  }
+}
+
+async function handlePaymentInitiated(payment) {
+  console.log("💰 Payment Captured:", payment);
+  // console.log("❌ Payment Failed:", payment.id, payment.error_description);
+  // Update booking status to failed
+}
+
+async function handlePayoutUpdated(payment) {
+  console.log("🔐 Payment Authorized:", payment);
+  // Payment is authorized but not captured yet
+}
+
+async function handlePayoutPending(payout) {
+  console.log("✅ Payout Processed:", payout);
+  // Your existing payout logic
+}
+
+async function handlePayoutRejected(payout) {
+  console.log("❌ Payout Failed:", payout);
+  // Your existing payout failure logic
+}
+
+async function handlePayoutReversed(payout) {
+  console.log("🔄 Payout Reversed:", payout);
+}

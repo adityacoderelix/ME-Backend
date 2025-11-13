@@ -15,6 +15,7 @@ const { parseMDYToUTC, parseMDYToUTCBooking } = require("../utils/convertDate");
 const HostPayout = require("../models/HostPayout");
 const { changeToUpperCase } = require("../utils/convertToUpperCase");
 const { paramsToObject } = require("../utils/paramsObject");
+const agenda = require("../utils/agenda");
 const TOKEN_EXPIRATION = "14d";
 const mongoConnectionString = process.env.DB_URI;
 const baseUrl = process.env.NEXTAUTH_URL;
@@ -1640,153 +1641,278 @@ exports.terminateNonUserBooking = async (req, res) => {
 };
 
 // Confirm a booking
+// exports.confirmBooking = async (req, res) => {
+//   try {
+//     const { bookingId, userEmail, hostEmail, userName, hostName } = req.body;
+
+//     // const generateToken = (payload) => {
+//     //   return jwt.sign({ bookingId: payload }, process.env.JWT_SECRET, {
+//     //     expiresIn: TOKEN_EXPIRATION,
+//     //   }); // expires in 14 days
+//     // };
+//     // const token = generateToken(bookingId);
+//     // if (!token) {
+//     //   throw new error("Unsucessful token");
+//     // }
+
+//     // const confirmationUrl = `${baseUrl}/rating?token=${token}&booking=${bookingId}`;
+//     // // const params = { userFirstName: "abc", url: confirmationUrl };
+//     // const agenda = new Agenda({ db: { address: mongoConnectionString } });
+//     // agenda.define("sendReviewEmail", async (job, done) => {
+//     //   await sendEmail(userEmail, 12, params);
+//     //   done();
+//     // });
+//     // function findSecondsDifference(date1, date2) {
+//     //   const oneSecond_ms = 1000;
+//     //   const date1_ms = date1.getTime();
+//     //   const date2_ms = date2.getTime();
+//     //   const delay = 5 * 60 * 60 * 1000;
+//     //   const difference_ms = date2_ms - date1_ms + delay;
+//     //   return Math.round(difference_ms / oneSecond_ms);
+//     // }
+
+//     // const checkOutBooking = await Booking.findById(bookingId);
+
+//     // const futureDate = new Date(checkOutBooking.checkOut);
+
+//     // await booking.save();
+//     // await sendOTPEmail(recipient, firstName, otp);
+
+//     // var secsFromNow = findSecondsDifference(new Date(), futureDate);
+
+//     const booking = await Booking.findByIdAndUpdate(bookingId, {
+//       status: "confirmed",
+//     }).populate("propertyId payment hostId userId");
+
+//     if (!booking) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Booking not found" });
+//     }
+//     const params = paramsToObject(userName, hostName, booking);
+
+//     const adminEmail = "admin@majesticescape.in";
+
+//     await sendEmail(userEmail, 10, params);
+//     await sendEmail(hostEmail, 19, params);
+//     await sendEmail(adminEmail, 18, params);
+//     // (async function () {
+//     //   try {
+//     //     await agenda.start();
+//     //     await agenda.schedule("in 2 minutes", "sendReviewEmail");
+//     //     // agenda.schedule(secsFromNow + " seconds", "sendReviewEmail");
+//     //   } catch (err) {
+//     //     console.error("Agenda start failed:", err.message);
+//     //   }
+//     // })();
+//     res.status(200).json({ success: true });
+//     //  res.status(200).json({ success: true, data: booking });
+//   } catch (error) {
+//     res.status(400).json({ success: false, error: error.message });
+//   }
+// };
+
 exports.confirmBooking = async (req, res) => {
   try {
-    const { bookingId, userEmail, hostEmail, userName, hostName } = req.body;
-
-    // const generateToken = (payload) => {
-    //   return jwt.sign({ bookingId: payload }, process.env.JWT_SECRET, {
-    //     expiresIn: TOKEN_EXPIRATION,
-    //   }); // expires in 14 days
-    // };
-    // const token = generateToken(bookingId);
-    // if (!token) {
-    //   throw new error("Unsucessful token");
-    // }
-
-    // const confirmationUrl = `${baseUrl}/rating?token=${token}&booking=${bookingId}`;
-    // // const params = { userFirstName: "abc", url: confirmationUrl };
-    // const agenda = new Agenda({ db: { address: mongoConnectionString } });
-    // agenda.define("sendReviewEmail", async (job, done) => {
-    //   await sendEmail(userEmail, 12, params);
-    //   done();
-    // });
-    // function findSecondsDifference(date1, date2) {
-    //   const oneSecond_ms = 1000;
-    //   const date1_ms = date1.getTime();
-    //   const date2_ms = date2.getTime();
-    //   const delay = 5 * 60 * 60 * 1000;
-    //   const difference_ms = date2_ms - date1_ms + delay;
-    //   return Math.round(difference_ms / oneSecond_ms);
-    // }
-
-    // const checkOutBooking = await Booking.findById(bookingId);
-
-    // const futureDate = new Date(checkOutBooking.checkOut);
-
-    // await booking.save();
-    // await sendOTPEmail(recipient, firstName, otp);
-
-    // var secsFromNow = findSecondsDifference(new Date(), futureDate);
-
-    const booking = await Booking.findByIdAndUpdate(bookingId, {
-      status: "confirmed",
-    }).populate("propertyId payment hostId userId");
+    const { bookingId } = req.body;
+    const booking = await Booking.findByIdAndUpdate(
+      bookingId,
+      { status: "confirmed" },
+      { new: true }
+    ).populate("hostId userId propertyId");
 
     if (!booking) {
       return res
         .status(404)
         .json({ success: false, message: "Booking not found" });
     }
-    const params = paramsToObject(userName, hostName, booking);
 
-    const adminEmail = "admin@majesticescape.in";
+    const bookingStatus = booking.status;
+    const hostEmail = booking.hostId.email;
+    const userEmail = booking.userId.email;
+    const token = jwt.sign({ bookingId }, process.env.JWT_SECRET, {
+      expiresIn: "14d",
+    });
 
-    await sendEmail(userEmail, 10, params);
-    await sendEmail(hostEmail, 19, params);
-    await sendEmail(adminEmail, 18, params);
-    // (async function () {
-    //   try {
-    //     await agenda.start();
-    //     await agenda.schedule("in 2 minutes", "sendReviewEmail");
-    //     // agenda.schedule(secsFromNow + " seconds", "sendReviewEmail");
-    //   } catch (err) {
-    //     console.error("Agenda start failed:", err.message);
-    //   }
-    // })();
+    const params = {
+      userName: `${booking.userId.firstName} ${booking.userId.lastName}`,
+      hostName: `${booking.hostId.firstName} ${booking.hostId.lastName}`,
+      propertyTitle: `${booking.propertyId.title}`,
+      userUrl: `${baseUrl}/rating?token=${token}&booking=${bookingId}`,
+      hostUrl: `${baseUrl}/rating?token=${token}&booking=${bookingId}`,
+    };
+
+    console.log("Agenda scheduling started");
+
+    // schedule 5 hours after checkout
+    const now = new Date();
+    const checkoutDate = new Date(booking.checkOut);
+    const delayMs = checkoutDate.getTime() + 5 * 60 * 60 * 1000 - now.getTime();
+    const delaySeconds = Math.max(0, Math.round(delayMs / 1000));
+
+    await agenda.schedule(`40 seconds`, "sendReviewEmail", {
+      userEmail,
+      hostEmail,
+      params,
+      bookingStatus,
+    });
+
+    console.log("✅ Job scheduled successfully");
     res.status(200).json({ success: true });
-    //  res.status(200).json({ success: true, data: booking });
   } catch (error) {
+    console.error("Booking confirm error:", error);
     res.status(400).json({ success: false, error: error.message });
   }
 };
+// exports.confirmInstantBooking = async (req, res) => {
+//   try {
+//     const { bookingId, userId, propertyTitle } = req.body;
+//     const booking = await Booking.findByIdAndUpdate(bookingId, {
+//       status: "confirmed",
+//     }).populate("hostId userId");
+
+//     if (!booking) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Booking not found" });
+//     }
+//     const bookingStatus = booking.status;
+//     const hostEmail = booking.hostId.email;
+//     const userEmail = booking.userId.email;
+//     const adminEmail = "admin@majesticescape.in";
+
+//     const generateToken = (payload) => {
+//       return jwt.sign({ bookingId: payload }, process.env.JWT_SECRET, {
+//         expiresIn: TOKEN_EXPIRATION,
+//       }); // expires in 14 days
+//     };
+//     const token = generateToken(bookingId);
+//     if (!token) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Unsucessful token" });
+//     }
+
+//     const userConfirmationUrl = `${baseUrl}/rating?token=${token}&booking=${bookingId}`;
+//     const hostConfirmationUrl = `${baseUrl}/rating?token=${token}&booking=${bookingId}`;
+//     const params = {
+//       userName: booking.userId.firstName + " " + booking.userId.lastName,
+//       hostName: booking.hostId.firstName + " " + booking.hostId.lastName,
+//       propertyTitle: propertyTitle,
+//       userUrl: userConfirmationUrl,
+//       hostUrl: hostConfirmationUrl,
+//     };
+//     const agenda = new Agenda({ db: { address: mongoConnectionString } });
+//     agenda.define("sendReviewEmail", async (job, done) => {
+//       console.log("Agenda Function");
+//       const { userEmail, hostEmail, params, bookingStatus } = job.attrs.data;
+//       if (bookingStatus == "confirmed") {
+//         console.log("Agenda Function Inside");
+//         await sendEmail(userEmail, 12, params);
+//         await sendEmail(hostEmail, 43, params);
+//         console.log("Agenda Function complete");
+//         done();
+//       }
+//     });
+//     function findSecondsDifference(date1, date2) {
+//       const oneSecond_ms = 1000;
+//       const date1_ms = date1.getTime();
+//       const date2_ms = date2.getTime();
+//       const delay = 5 * 60 * 60 * 1000;
+//       const difference_ms = date2_ms - date1_ms + delay;
+//       return Math.round(difference_ms / oneSecond_ms);
+//     }
+
+//     // const checkOutBooking = await Booking.findById(bookingId);
+
+//     const futureDate = new Date(booking.checkOut);
+
+//     // await booking.save();
+//     // await sendOTPEmail(recipient, firstName, otp);
+
+//     // var secsFromNow = findSecondsDifference(new Date(), futureDate);
+//     // const params = { userFirstName: "Test" };
+
+//     // await sendEmail(userEmail, 35, params);
+//     // await sendEmail(hostEmail, 34, params);
+//     // await sendEmail(adminEmail, 36, params);
+
+//     (async function () {
+//       try {
+//         console.log("Agenda Started");
+//         await agenda.start();
+//         await agenda.schedule("in 2 minutes", "sendReviewEmail", {
+//           userEmail,
+//           hostEmail,
+//           params,
+//           bookingStatus,
+//         });
+//         // agenda.schedule(secsFromNow + " seconds", "sendReviewEmail");
+//       } catch (err) {
+//         console.error("Agenda start failed:", err.message);
+//       }
+//     })();
+//     res.status(200).json({ success: true });
+//     //  res.status(200).json({ success: true, data: booking });
+//   } catch (error) {
+//     res.status(400).json({ success: false, error: error.message });
+//   }
+// };
+// Mark booking as paid
 
 exports.confirmInstantBooking = async (req, res) => {
   try {
-    const { bookingId, userId } = req.body;
-
-    // const generateToken = (payload) => {
-    //   return jwt.sign({ bookingId: payload }, process.env.JWT_SECRET, {
-    //     expiresIn: TOKEN_EXPIRATION,
-    //   }); // expires in 14 days
-    // };
-    // const token = generateToken(bookingId);
-    // if (!token) {
-    //   throw new error("Unsucessful token");
-    // }
-
-    // const confirmationUrl = `${baseUrl}/rating?token=${token}&booking=${bookingId}`;
-    // // const params = { userFirstName: "abc", url: confirmationUrl };
-    // const agenda = new Agenda({ db: { address: mongoConnectionString } });
-    // agenda.define("sendReviewEmail", async (job, done) => {
-    //   await sendEmail(userEmail, 12, params);
-    //   done();
-    // });
-    // function findSecondsDifference(date1, date2) {
-    //   const oneSecond_ms = 1000;
-    //   const date1_ms = date1.getTime();
-    //   const date2_ms = date2.getTime();
-    //   const delay = 5 * 60 * 60 * 1000;
-    //   const difference_ms = date2_ms - date1_ms + delay;
-    //   return Math.round(difference_ms / oneSecond_ms);
-    // }
-
-    // const checkOutBooking = await Booking.findById(bookingId);
-
-    // const futureDate = new Date(checkOutBooking.checkOut);
-
-    // await booking.save();
-    // await sendOTPEmail(recipient, firstName, otp);
-
-    // var secsFromNow = findSecondsDifference(new Date(), futureDate);
-    const params = { userFirstName: "xyz" };
-    const booking = await Booking.findByIdAndUpdate(bookingId, {
-      status: "confirmed",
-    });
+    const { bookingId, propertyTitle } = req.body;
+    const booking = await Booking.findByIdAndUpdate(
+      bookingId,
+      { status: "confirmed" },
+      { new: true }
+    ).populate("hostId userId");
 
     if (!booking) {
       return res
         .status(404)
         .json({ success: false, message: "Booking not found" });
     }
-    const host = await Booking.findById(bookingId).populate(
-      "hostId propertyId"
-    );
-    const hostEmail = host.hostId.email;
-    const data = await User.findById(userId);
-    const userEmail = await data.email;
 
-    const adminEmail = "majesticescape.in@gmail.com";
+    const bookingStatus = booking.status;
+    const hostEmail = booking.hostId.email;
+    const userEmail = booking.userId.email;
+    const token = jwt.sign({ bookingId }, process.env.JWT_SECRET, {
+      expiresIn: "14d",
+    });
 
-    // await sendEmail(userEmail, 35, params);
-    // await sendEmail(hostEmail, 34, params);
-    // await sendEmail(adminEmail, 36, params);
-    // (async function () {
-    //   try {
-    //     await agenda.start();
-    //     await agenda.schedule("in 2 minutes", "sendReviewEmail");
-    //     // agenda.schedule(secsFromNow + " seconds", "sendReviewEmail");
-    //   } catch (err) {
-    //     console.error("Agenda start failed:", err.message);
-    //   }
-    // })();
+    const params = {
+      userName: `${booking.userId.firstName} ${booking.userId.lastName}`,
+      hostName: `${booking.hostId.firstName} ${booking.hostId.lastName}`,
+      propertyTitle,
+      userUrl: `${baseUrl}/rating?token=${token}&booking=${bookingId}`,
+      hostUrl: `${baseUrl}/rating?token=${token}&booking=${bookingId}`,
+    };
+
+    console.log("Agenda scheduling started");
+
+    // schedule 5 hours after checkout
+    const now = new Date();
+    const checkoutDate = new Date(booking.checkOut);
+    const delayMs = checkoutDate.getTime() + 5 * 60 * 60 * 1000 - now.getTime();
+    const delaySeconds = Math.max(0, Math.round(delayMs / 1000));
+
+    await agenda.schedule(`40 seconds`, "sendReviewEmail", {
+      userEmail,
+      hostEmail,
+      params,
+      bookingStatus,
+    });
+
+    console.log("✅ Job scheduled successfully");
     res.status(200).json({ success: true });
-    //  res.status(200).json({ success: true, data: booking });
   } catch (error) {
+    console.error("Booking confirm error:", error);
     res.status(400).json({ success: false, error: error.message });
   }
 };
-// Mark booking as paid
+
 exports.markBookingAsPaid = async (req, res) => {
   try {
     const { bookingId, hostEmail, userId, manual, payment } = req.body;
