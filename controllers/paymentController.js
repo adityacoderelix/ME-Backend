@@ -751,8 +751,6 @@ async function handlePayoutReversed(payout) {
   console.log("🔄 Payout Reversed:", payout);
 }
 
-
-
 // // controllers/paymentController.js
 // const Razorpay = require("razorpay");
 // const crypto = require("crypto");
@@ -1122,7 +1120,7 @@ async function handlePayoutReversed(payout) {
 //         error: "Host payout document details not found",
 //       };
 //     }
- 
+
 //     console.log("Entered payout3");
 //     const payout = await axios.post(
 //       `${API_URL}/payouts`,
@@ -1174,8 +1172,6 @@ async function handlePayoutReversed(payout) {
 //   }
 // }
 
-
-
 // async function setcronjob(){
 //   console.log("entered cron");
 //   try {
@@ -1218,7 +1214,6 @@ async function handlePayoutReversed(payout) {
 //   }
 // };
 
-
 // exports.createPayout = async (req, res) => {
 //   try {
 //     const { bookingId, propertyId, amount } = req.body;
@@ -1237,7 +1232,7 @@ async function handlePayoutReversed(payout) {
 //     // }
 
 //     const newAmount = Number(amount) - (3 / 100) * Number(amount);
- 
+
 //     const data = new HostPayout({
 //       bookingId,
 //       propertyId,
@@ -1247,8 +1242,7 @@ async function handlePayoutReversed(payout) {
 //     await data.save();
 
 //     const job = await setcronjob();
-  
-    
+
 //     res.status(200).json({
 //       success: true,
 //       data: data,
@@ -1273,7 +1267,7 @@ async function handlePayoutReversed(payout) {
 
 //     // ✅ Manual raw body collection
 //     let rawBody = '';
-    
+
 //     req.on('data', chunk => {
 //       rawBody += chunk.toString();
 //     });
@@ -1281,7 +1275,7 @@ async function handlePayoutReversed(payout) {
 //     req.on('end', async () => {
 //       try {
 //         console.log("🔍 Raw body length:", rawBody.length);
-        
+
 //         // Verify signature
 //         const expectedSignature = crypto
 //           .createHmac('sha256', secret)
@@ -1300,12 +1294,10 @@ async function handlePayoutReversed(payout) {
 //         }
 
 //         console.log("✅ Webhook verified!");
-        
+
 //         // Parse payload
 //         const payload = JSON.parse(rawBody);
 //         console.log("📦 Webhook Event:", payload.event);
-       
-   
 
 //         // Process asynchronously
 //         processWebhookEvent(payload).catch(console.error);
@@ -1324,7 +1316,7 @@ async function handlePayoutReversed(payout) {
 // async function processWebhookEvent(payload) {
 //   try {
 //     console.log("🔄 Processing webhook event:", payload);
-    
+
 //     switch (payload.event) {
 //       case "payment.captured":
 //         console.log("payment captured");
@@ -1350,7 +1342,7 @@ async function handlePayoutReversed(payout) {
 //       default:
 //         console.log("⚪ Unhandled webhook event:", payload.event);
 //     }
-    
+
 //     console.log("✅ Event processing completed:", payload.event);
 //   } catch (error) {
 //     console.error(`❌ Error processing ${payload.event}:`, error);
@@ -1365,17 +1357,17 @@ async function handlePayoutReversed(payout) {
 //     // console.log("Amount:", payment.amount / 100); // Convert paise to rupees
 //     // console.log("Order ID:", payment.order_id);
 //     // console.log("Customer:", payment.email);
-    
+
 //     // Update your booking status in database
 //     // await HostPayout.findOneAndUpdate(
 //     //   { razorpayOrderId: payment.order_id },
-//     //   { 
+//     //   {
 //     //     paymentStatus: 'captured',
 //     //     razorpayPaymentId: payment.id,
 //     //     paidAt: new Date()
 //     //   }
 //     // );
-    
+
 //     console.log("✅ Booking payment status updated");
 //   } catch (error) {
 //     console.error("❌ Error handling payment.captured:", error);
@@ -1392,7 +1384,6 @@ async function handlePayoutReversed(payout) {
 //   console.log("🔐 Payment Authorized:", payment);
 //   // Payment is authorized but not captured yet
 // }
-
 
 // async function handlePayoutPending(payout) {
 //   console.log("✅ Payout Processed:", payout);

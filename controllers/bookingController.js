@@ -1998,8 +1998,6 @@ const calculateRefund = (booking) => {
   return 0;
 };
 
-
-
 // const Booking = require("../models/Booking");
 // const puppeteer = require("puppeteer");
 // const Payment = require("../models/Payment");
@@ -2600,8 +2598,7 @@ const calculateRefund = (booking) => {
 //       background-color: #fff;
 //       width: 100%;
 //       max-width: 700px;
-      
-      
+
 //       padding: 32px;
 //     }
 
