@@ -17,8 +17,12 @@ const app = express();
 // });
 
 const allowedOrigins = [
+  // "https://apidemo.digitap.work/validation/kyc/v1/pan-basic",
   "https://user-navy-five.vercel.app",
   "https://me-admin-swart.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5005",
+  "http://localhost:3001",
 ];
 
 app.use((req, res, next) => {
@@ -41,7 +45,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
 const webhookRoutes = require("./routes/webhookRoutes");
 app.use("/api/v1/paymentforpayout", webhookRoutes);
 
