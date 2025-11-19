@@ -16,6 +16,14 @@ const app = express();
 //   next();
 // });
 
+// app.use(cors());
+// app.options("*", cors());
+
+// app.use((req, res, next) => {
+//   console.log(`${req.method} ${req.url} received`);
+//   next();
+// });
+
 const allowedOrigins = [
   // "https://apidemo.digitap.work/validation/kyc/v1/pan-basic",
   "https://user-navy-five.vercel.app",
@@ -45,6 +53,7 @@ app.use((req, res, next) => {
   }
   next();
 });
+const webhookRoutes = require("./routes/webhookRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
 app.use("/api/v1/paymentforpayout", webhookRoutes);
 
