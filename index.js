@@ -31,6 +31,9 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5005",
   "http://localhost:3001",
+  "https://apidemo.digitap.work",
+  "https://svcdemo.digitap.work",
+  "https://svc.digitap.ai",
 ];
 
 app.use((req, res, next) => {
