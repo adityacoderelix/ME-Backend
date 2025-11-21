@@ -28,12 +28,14 @@ const allowedOrigins = [
   // "https://apidemo.digitap.work/validation/kyc/v1/pan-basic",
   "https://user-navy-five.vercel.app",
   "https://me-admin-swart.vercel.app",
+  "https://me-backend-one.vercel.app",
   "http://localhost:3000",
   "http://localhost:5005",
   "http://localhost:3001",
   "https://apidemo.digitap.work",
   "https://svcdemo.digitap.work",
   "https://svc.digitap.ai",
+  "https://majestic-escape-host-properties.blr1.digitaloceanspaces.com/"
 ];
 
 app.use((req, res, next) => {
@@ -184,7 +186,7 @@ app.use("/api/v1/accounts", accountsRoutes);
 app.use("/api/v1/kyc", kycRoutes);
 app.use("/api/v1/booking", bookingRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
-app.use("/api/v1/host-bank", uploadRoutes);
+// app.use("/api/v1/host-bank", uploadRoutes);
 app.use("/api/v1/property-registration-no", propertyRegistrationNoRoutes);
 // app.use("/api/v1/stay", stayRoutes);
 app.use("/api/v1/review", reviewRoutes);

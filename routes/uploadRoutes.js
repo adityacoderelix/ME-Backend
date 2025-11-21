@@ -4,6 +4,7 @@ const multer = require("multer");
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 router.post("/", upload.array("images", 10), uploadController.uploadImages);
+router.delete("/delete", uploadController.deleteImages);
 router.post("/generate-presigned-url", uploadController.generatePresignedUrl);
 
 module.exports = router;
