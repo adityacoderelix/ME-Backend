@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
+    tokenVersion: { type: Number, default: 0 },
     about: { type: String },
     languages: { type: [String], default: [] },
     isVerified: { type: Boolean, default: false },
