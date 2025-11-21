@@ -27,12 +27,13 @@ exports.uploadImages = async (req, res) => {
     res.json({ urls }); // Return array of URLs
   } catch (error) {
     console.error("Upload error:", error);
-    res.status(500).json({ error: "Upload failed" });
+    // res.status(500).json({ error: "Upload failed" });
+    res.status(500).json({ error: error.message || "Upload failed" });
   }
 };
 
-exports.deleteImages=async(req,res)=>{
- try {
+exports.deleteImages = async (req, res) => {
+  try {
     const { url } = req.body;
     const key = url.split(".digitaloceanspaces.com/")[1];
 
