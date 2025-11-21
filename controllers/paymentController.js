@@ -565,7 +565,7 @@ exports.createPayout = async (req, res) => {
   }
 };
 
-// cron.schedule("* * * * *", async () => {
+// cron.schedule("59 23 * * *", async () => {
 exports.schedulecron = async (req, res) => {
   try {
     console.log("enter payout cron");
@@ -574,14 +574,45 @@ exports.schedulecron = async (req, res) => {
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
+    const twoDayAgo = new Date(todayStart);
+    twoDayAgo.setDate(todayStart.getDate() - 2);
+    console.log("payout timing for", twoDayAgo, todayEnd);
     const confirmedBookings = await Booking.find({
       status: "confirmed",
-      checkIn: { $gte: todayStart, $lte: todayEnd },
+      checkIn: { $gte: twoDayAgo, $lte: todayEnd },
     });
 
     console.log(
       `📅 Found ${confirmedBookings.length} bookings for payout today`
     );
+    const bookingsToProcess = [];
+
+    for (const booking of confirmedBookings) {
+      const payoutRecord = await HostPayout.findOne({ bookingId: booking._id });
+
+      // CASE A: No payout exists → process it
+      if (!payoutRecord) {
+        console.log(
+          `🆕 No payout record found → processing booking ${booking._id}`
+        );
+        bookingsToProcess.push(booking);
+        continue;
+      }
+
+      // CASE B: Payout exists but failed or reversed → retry
+      if (["failed", "reversed"].includes(payoutRecord.status)) {
+        console.log(
+          `🔁 Payout status "${payoutRecord.status}" → retry booking ${booking._id}`
+        );
+        bookingsToProcess.push(booking);
+        continue;
+      }
+
+      // CASE C: Payout already successful → skip
+      console.log(
+        `⏭️ Skipping booking ${booking._id} (payout status: ${payoutRecord.status})`
+      );
+    }
 
     const results = [];
     for (const booking of confirmedBookings) {
