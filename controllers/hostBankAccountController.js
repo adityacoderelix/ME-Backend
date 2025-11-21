@@ -29,10 +29,20 @@ exports.updateBankAccountDetails = async (req, res) => {
     // let bankAccount = await HostBankAccount.findOne({ userId })
     let bankAccount = await HostBankAccount.findOne({ hostId: userId });
     if (bankAccount) {
-      bankAccount.accountNumber = accountNumber;
-      bankAccount.ifscCode = ifscCode;
-      bankAccount.accountHolderName = accountHolderName;
-      bankAccount.bankName = bankName;
+      // bankAccount.accountNumber = accountNumber;
+      // bankAccount.ifscCode = ifscCode;
+      // bankAccount.accountHolderName = accountHolderName;
+      // bankAccount.bankName = bankName;
+      const bankAccount = await HostBankAccount.findOneAndUpdate(
+        { hostId: userId },
+        {
+          accountNumber,
+          ifscCode,
+          accountHolderName,
+          bankName,
+        }
+        // { new: true, upsert: true } // creates if not exists, returns updated doc
+      );
     } else {
       bankAccount = new HostBankAccount({
         hostId: userId,
@@ -41,9 +51,8 @@ exports.updateBankAccountDetails = async (req, res) => {
         accountHolderName,
         bankName,
       });
+      await bankAccount.save();
     }
-
-    await bankAccount.save();
 
     res.status(200).json({
       message: "Bank account details updated successfully",
