@@ -129,11 +129,14 @@ exports.verifyGst = async (req, res) => {
 
     return res.json({ success: true, data: statusGstResult });
   } catch (error) {
-    console.error("verifyKYC error:", err.response?.data || err.message || err);
+    console.error(
+      "verifyKYC error:",
+      error.response?.data || error.message || error
+    );
     return res.status(500).json({
       success: false,
-      message: err.message || "Server error",
-      details: err.response?.data,
+      message: error.message || "Server error",
+      details: error.response?.data,
     });
   }
 };
