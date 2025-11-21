@@ -63,7 +63,7 @@ exports.verifyGst = async (req, res) => {
     const { userId, panNumber, gstNumber } = req.body;
 
     if (!userId) return res.status(400).json({ error: "userId required" });
-
+    console.log("midway0");
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -83,6 +83,7 @@ exports.verifyGst = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Business PAN not found " });
     }
+    console.log("midway1", statusResult);
     statusLog.status = "success";
     statusLog.responseData = statusResult;
     await statusLog.save();
@@ -90,14 +91,14 @@ exports.verifyGst = async (req, res) => {
     const data = statusResult?.result?.gstinResList.filter(
       (item) => item.gstin == gstNumber
     );
-
+    console.log("midway2", data);
     if (!data) {
       return res.status(404).json({
         success: false,
         message: "Gst associated with Business PAN not found ",
       });
     }
-
+    console.log("midway3", data[0]);
     if (data[0].authStatus != "Active") {
       return res.status(404).json({
         success: false,
